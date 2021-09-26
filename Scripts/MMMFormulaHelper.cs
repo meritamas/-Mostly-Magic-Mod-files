@@ -1,8 +1,15 @@
-// Project:         Unleveled Spells mod for Daggerfall Unity (http://www.dfworkshop.net)
-// Copyright:       Copyright (C) 2020 meritamas
+// Project:         MeriTamas's (Mostly) Magic Mod for Daggerfall Unity (http://www.dfworkshop.net)
+// Copyright:       Copyright (C) 2021 meritamas
 // License:         MIT License (http://www.opensource.org/licenses/mit-license.php)
 // Author:          meritamas (meritamas@outlook.com)
-// Big thanks to Gavin Clayton (interkarma@dfworkshop.net) for his suggestion to create this class. This resulted in me being able to simply re-use this class for Advanced Teleportation as well.
+// Big thanks to Gavin Clayton (interkarma@dfworkshop.net) for his suggestion to create this class. This will make things easier and be an asset as the mod is developed furter.
+
+/*
+ * The code is sloppy at various places - this is partly due to the fact that this mod was created by merging three smaller mods.
+ * Some things are redundant, comments are missing, some comments are not useful anymore etc.
+ * I have the intention of cleaning it up in the future.
+ * For now, it seems to work as intended or - let's rather say - reasonably well.
+*/
 
 using UnityEngine;
 using DaggerfallConnect;
