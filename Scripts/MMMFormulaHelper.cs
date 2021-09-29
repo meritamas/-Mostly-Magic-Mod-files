@@ -21,7 +21,7 @@ using DaggerfallWorkshop.Game.MagicAndEffects;
 namespace MTMMM
 {
     public delegate void MTDebugMethod (string s);
-    public delegate int GetSpellLevelMethod(BaseEntityEffect effect);
+    public delegate int GetSpellLevelMethod(IEntityEffect effect);    
 
     public static class MMMFormulaHelper
     {
@@ -163,6 +163,24 @@ namespace MTMMM
         }
 
         /// <summary>
+        /// The method for Spell Level Calculation supplied to the game's FormulaHelper 
+        /// </summary>
+        /// <returns>
+        /// Uses the Mod's selected Spell Level calculator routine to return a Spell Level. By default, it is calculated via GetSpellLevel1 as follows:
+        ///     -   Skill Spell Level = (Skill-9)/3  + possible modifier based on Luck
+        ///     -   Willpower Spell Level = 10 + Willpower/5 + possible modifier based on Luck
+        /// The modifiers based on Luck are calculated based on a certain amount of Luck Points; Number of Luck Points = (Luck - 50) / 10
+        ///     Then,
+        ///     -   if the Number of Luck Points is negative, it is subtracted from the Lesser of the two Spell levels (negative modifier)
+        ///     -   if the Number of Luck Points is positive, the points are used one after the other to increment the lesser of the Spell levels
+        /// The spell level returned is the lesser of the spell levels after applying the luck modifiers.    
+        /// </returns>
+        public static int GetSpellLevelForGame(DaggerfallEntity casterDummy, IEntityEffect effect)
+        {
+            return GetSpellLevel (effect);
+        }
+
+        /// <summary>
         /// The default method for Spell Level Calculation 
         /// </summary>
         /// <returns>
@@ -175,7 +193,7 @@ namespace MTMMM
         ///     -   if the Number of Luck Points is positive, the points are used one after the other to increment the lesser of the Spell levels
         /// The spell level returned is the lesser of the spell levels after applying the luck modifiers.    
         /// </returns>
-        public static int GetSpellLevel1 (BaseEntityEffect effect)
+        public static int GetSpellLevel1 (IEntityEffect effect)
         {
             DaggerfallEntityBehaviour caster = effect.Caster;
 

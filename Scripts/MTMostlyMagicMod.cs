@@ -165,8 +165,8 @@ namespace MTMMM
             VerboseMessage(verboseMessage);
             // verbosity features set up
 
-            VerboseMessage(RegisterEffectsWithBroker());    // not the best solution but should work for now
-            VerboseMessage(RegisterSpellsWithBroker());
+            FormulaHelper.RegisterOverride(modInstance, "CalculateCasterLevel", (Func<DaggerfallEntity, IEntityEffect, int>)MMMFormulaHelper.GetSpellLevelForGame);    
+            VerboseMessage(RegisterSpellsWithBroker());         // not the best solution but should work for now
         }
 
         /// <summary>
@@ -330,66 +330,10 @@ namespace MTMMM
             DaggerfallUI.AddHUDText(greetingMessageToPlayerUnleveledEnemies);                    // display greeting message to player            
         }
         #endregion
-        
+
         #region Unleveled Spells part
-
         /// <summary>
-        /// Makes an attempt to register the supported effect classes to EntityEffectBroker.
-        /// Each failure is reported to the player.
-        /// The list of successes is returned in a string.
-        /// </summary>
-        /// <returns>
-        /// Returns the list of effect classes successfully registered to EntityEffectBroker.
-        /// </returns>
-        public static string RegisterEffectsWithBroker()
-        {
-            string effectsSuccessfullyAdded = "";           // the string used to accumulate the spells supported
-
-            BaseEntityEffect[] effectsToAdd = {
-                new MTHealFatigue(), new MTHealHealth(),    // Magnitude            //OK
-                new MTCureDisease(), new MTCureParalyzation(), new MTCurePoison(),              // Chance       //OK
-                new MTFreeAction(),                         // duration     //OK
-                new MTSpellAbsorption(),                    // DUR and Chance   //OK
-                new MTRegenerate(),                         // MAG and DUR  // OK
-                new MTFortifyAgility(),                     // DUR and MAG - incumbent effects
-                        // Restoration effects done
-
-                new MTDamageHealth(), new MTDamageFatigue(), new MTDamageSpellPoints(),             // MAG  //ok
-                new MTContinuousDamageFatigue(), new MTContinuousDamageHealth(), new MTContinuousDamageSpellPoints(),   // DUR + MAG  //ok
-                new MTDisintegrate(),                       // chance  //ok
-                        // Destruction effects done
-
-                new MTWaterWalking(), new MTDetectEnemy(), new MTDetectMagic(), new MTDetectTreasure(), //new MTLevitate(),            // DUR  // ok                
-                new MTSpellReflection(), new MTSpellAbsorption(),       // DUR + Chance     //OK
-                        // Thaumaturgy effects done
-
-                new MTSlowfall(), new MTWaterBreathing(),          // DUR       //OK
-                new MTParalyze(),  // DUR + Chance   //  OK
-                new MTShield(),                                 // DUR + MAG  //ok
-                // new MTRepairItem(),     // my new repair spell - it is added separately along with its spells
-                        // Alteration effects done
-
-                new MTDispelDaedra(), new MTDispelUndead(), new MTDispelMagic(), new MTOpen(),  // Chance  // OK
-                new MTSilence(), new MTSoulTrap(),            // DUR and Chance     // ok
-                        // Mysticism effects done
-
-                new MTChameleonNormal(), new MTChameleonTrue()     // DUR //ok
-                        // Illusion effects done
-            };
-
-            foreach (BaseEntityEffect effectBeingAdded in effectsToAdd)
-            {
-                if (!GameManager.Instance.EntityEffectBroker.RegisterEffectTemplate(effectBeingAdded, true))
-                    effectsSuccessfullyAdded += "    " + effectBeingAdded.Properties.Key + " (PROBLEM)";
-                else
-                    effectsSuccessfullyAdded += "    " + effectBeingAdded.Properties.Key;
-            }
-
-            return effectsSuccessfullyAdded;
-        }
-
-        /// <summary>
-        /// Makes an attempt to register spells with any custom spell effects.
+        /// Makes an attempt to register new MMM spells with any custom spell effects.
         /// The list of failures is returned in a string.
         /// </summary>
         /// <returns>
@@ -463,8 +407,6 @@ namespace MTMMM
             // Register the offer
             GameManager.Instance.EntityEffectBroker.RegisterCustomSpellBundleOffer(minorRepairOffer);
 
-
-
             EffectSettings effectSettings2 = new EffectSettings()
             {
                 MagnitudeBaseMin = 1,
@@ -512,7 +454,6 @@ namespace MTMMM
 
             // Register the offer
             GameManager.Instance.EntityEffectBroker.RegisterCustomSpellBundleOffer(repairOffer);
-
 
             return returnString;
         }
