@@ -27,6 +27,14 @@ using DaggerfallWorkshop.Game.UserInterfaceWindows;
 using DaggerfallWorkshop.Game.MagicAndEffects;
 using DaggerfallConnect;
 
+/*  The modules:
+ *  - Unleveled Enemies
+ *  - Magic-Related Rules Changes
+ *  - New Effects and Spells
+ *  - Quality of Life (currently to raise timescale while running to travel+train at the same time)
+ *  - Experimental
+*/
+
 namespace MTMMM
 {
     public class MTMostlyMagicMod : MonoBehaviour
@@ -57,7 +65,13 @@ namespace MTMMM
         public static string BasicGreetingsMessage = "Spell effects unleveled:";
         public static string greetingMessageToPlayerUnleveledSpells;   // this is used to communicate to the appropriate method the string message that needs to be conveyed 
 
-        #region Common helpers
+            // these fields are for TimeAccelerator
+        static float baseFixedDeltaTime;
+        static float baseTimeScale;
+        static int timeAcceleratorMultiple;
+        static int diseaseCount;
+
+        #region Common helpers and routines
         /// <summary>
         /// A helper to display messages on the screen on the HUD or in a window
         /// </summary>
@@ -67,7 +81,8 @@ namespace MTMMM
                 DaggerfallUI.AddHUDText(message);
             else
             {
-                /*if (MessageBox == null)
+                DaggerfallUI.AddHUDText(message.Substring(0, HUDLineLength));        // this will do for now
+                /*if (MessageBox == null)       // TODO: add something here to write the first 120 chars onto the HUD
                 {
                     MessageBox = new DaggerfallMessageBox(DaggerfallWorkshop.Game.DaggerfallUI.UIManager, null, true);
                     MessageBox.AllowCancel = true;
@@ -77,30 +92,69 @@ namespace MTMMM
                 MessageBox.SetText(message);
                 DaggerfallUI.UIManager.PushWindow(MessageBox); */
             }
+        }        
+
+        /// <summary>
+        /// Method to send debug messages, meant to be used by MMMFormulaHelper
+        /// </summary>
+        public static void Message(string message)
+        {
+            Message(message, true, true, false, false);
         }
 
         /// <summary>
-        /// Method to send a message, meant to be used by the MTMostlyMagicMod class
+        /// Method to send messages, depending on settings either to HUD or the Player, or both or neither
         /// </summary>
-        public static void MessageToPlayer(string message)
+        public static void Message(string message, bool toHud=true, bool toPlayer=true, bool forceToHUD=false, bool forceToPlayer=false)
         {
-            DisplayMessageOnScreen(message);
-        }
+            string msg = "MT MMM: " + message;
 
-        /// <summary>
-        /// Method to send a message, meant to be used by the MMMFormulaHelper class
-        /// </summary>
-        public static void VerboseMessage(string message)
-        {
-            if (ourModSettings.GetValue<bool>("UnleveledSpells", "DebugToHUD"))
+            if (forceToHUD || (toHud && ourModSettings.GetValue<bool>("Debug", "DebugToHUD")))
                 DisplayMessageOnScreen(message);
 
-            if (ourModSettings.GetValue<bool>("UnleveledSpells", "DebugToLog"))
-                Debug.Log(message);
+            if (forceToPlayer || (toPlayer && ourModSettings.GetValue<bool>("Debug", "DebugToLog")))
+                Debug.Log(msg);
         }
+
+        public void Awake()
+        {
+            if (ourModSettings.GetValue<bool>("Magic-relatedRuleChanges", "IntelligenceRequirementForPurchasingSpells"))
+                RegisterMTSpellBookWindow();
+
+            if (ourModSettings.GetValue<bool>("NonMagicRuleChanges", "AlternativeSunLightDirections"))
+            {
+                //  GameManager.Instance.SunlightManager.Angle = -40f;      this code does not work ; but this is where the code that does the job should go 
+            }
+        }
+
+        public void Start()
+        {
+            if (ourModSettings.GetValue<bool>("UnleveledEnemies", "Main"))
+                InitUnleveledEnemiesOnAwake();
+        }
+
+        void Update()
+        {
+            TimeAcceleratorUpdate();
+        }
+
         #endregion
 
         #region ModInit common parts
+
+        /// <summary>
+        /// Gives the player info on init success.      // TODO: re-evaluate the need for this
+        /// </summary>
+        [Invoke(StateManager.StateTypes.Game, 1)]
+        public static void GiveInfoToPlayer(InitParams initParams)
+        {
+            if (problem)
+                Message("Problem adding Advanced Teleport", true, true, true, true);
+            else
+                Message("Override for Teleport (Recall) (Advanced Teleportation) successfully registered.");
+
+            InitTimeAcceleratorPart();
+        }
 
         /// <summary>
         /// Init the class as a first step before work begins:
@@ -113,24 +167,13 @@ namespace MTMMM
             modInstance = ModManager.Instance.GetMod(modTitle);
             ourModSettings = modInstance.GetSettings();
 
-            MMMFormulaHelper.MMMFormulaHelperInfoMessage = VerboseMessage;
-        }
-
-        /// <summary>
-        /// Initialize the Advanced Teleportation parts
-        /// </summary>
-        public static void InitAdvancedTeleportation()
-        {
-            BaseEntityEffect ourTeleportEffect = new MTTeleport();
-
-            problem = !GameManager.Instance.EntityEffectBroker.RegisterEffectTemplate(ourTeleportEffect, true);
-            ConsoleCommandsDatabase.RegisterCommand("advanced-teleport-kill", SaveOrNotToSave);
-        }
+            MMMFormulaHelper.MMMFormulaHelperInfoMessage = Message;
+        }        
 
         /// <summary>
         /// Initialize the Unleveled Enemies parts
         /// </summary>
-        public static void InitUnleveledEnemies()
+        public static void InitUnleveledEnemiesOnStart()
         {
             GameObject go = DaggerfallUnity.Instance.Option_EnemyPrefab.transform.gameObject;
             go.AddComponent<MTMMM.RecalcStats>();
@@ -140,34 +183,7 @@ namespace MTMMM
 
             greetingMessageToPlayerUnleveledEnemies = "Enemy prefab changed successfully";
             Debug.Log("InitUnleveledEnemies module init method Finished");
-        }
-
-        /// <summary>
-        /// Initialize the Unleveled Spells parts
-        /// </summary>
-        public static void InitUnleveledSpells()
-        {
-           // starting to set up verbosity features
-                string verboseMessage = "Verbose";
-
-                // Setting MMMFormulaHelper verbosity features based on mod settings and adding the features turned on to a string to be displayed to the player  
-                if (MMMFormulaHelper.SendInfoMessagesOnPCSpellLevel = ourModSettings.GetValue<bool>("UnleveledSpells", "PCLevel"))
-                    verboseMessage += " -- PC Spell Level";
-                if (MMMFormulaHelper.SendInfoMessagesOnNonPCSpellLevel = ourModSettings.GetValue<bool>("UnleveledSpells", "NonPCLevel"))
-                    verboseMessage += " -- Non-PC Spell Level";
-                if (MMMFormulaHelper.SendInfoMessagesOnMagnitude = ourModSettings.GetValue<bool>("UnleveledSpells", "Magnitudes"))
-                    verboseMessage += " -- Magnitudes";
-                if (MMMFormulaHelper.SendInfoMessagesOnChance = ourModSettings.GetValue<bool>("UnleveledSpells", "Chances"))
-                    verboseMessage += " -- Chances";
-                if (MMMFormulaHelper.SendInfoMessagesOnDuration = ourModSettings.GetValue<bool>("UnleveledSpells", "Durations"))
-                    verboseMessage += " -- Durations";
-
-            VerboseMessage(verboseMessage);
-            // verbosity features set up
-
-            FormulaHelper.RegisterOverride(modInstance, "CalculateCasterLevel", (Func<DaggerfallEntity, IEntityEffect, int>)MMMFormulaHelper.GetSpellLevelForGame);    
-            VerboseMessage(RegisterSpellsWithBroker());         // not the best solution but should work for now
-        }
+        }        
 
         /// <summary>
         /// finish initialization:
@@ -188,161 +204,44 @@ namespace MTMMM
         {
             StartInit(initParams.ModTitle);        // init the class as a first step before work begins
 
-            if (ourModSettings.GetValue<bool>("AdvancedTeleportation", "Main"))
-                InitAdvancedTeleportation();
+            
+            InitNewSpellsAndEffects();
             if (ourModSettings.GetValue<bool>("UnleveledEnemies", "Main"))
-                InitUnleveledEnemies();
-            if (ourModSettings.GetValue<bool>("UnleveledSpells", "Main"))
-                InitUnleveledSpells();
+                InitUnleveledEnemiesOnStart();
+
+
+            InitRuleChanges();
+            
+
 
             EndInit();          // Finish Mod Initialization            
         }
         #endregion
+
+        #region New Spells and Effects part
+        /// <summary>
+        /// Initialize the New Spells and Effects parts
+        /// </summary>
+        public static void InitNewSpellsAndEffects()
+        {
+            if (ourModSettings.GetValue<bool>("NewEffectsAndSpells", "AdvancedTeleporation"))
+            {
+                BaseEntityEffect ourTeleportEffect = new MTTeleport();
+
+                problem = !GameManager.Instance.EntityEffectBroker.RegisterEffectTemplate(ourTeleportEffect, true);
+                ConsoleCommandsDatabase.RegisterCommand("advanced-teleport-kill", SaveOrNotToSave);
+            }
+                        
+
+
+            if (ourModSettings.GetValue<bool>("NewEffectsAndSpells", "FixItem"))
+                RegisterFixItem();
+        }
+
+
         
-        #region Advanced Teleportation part
-        /// <summary>
-        /// Gives the player info on init success.
-        /// </summary>
-        [Invoke(StateManager.StateTypes.Game, 1)]
-        public static void GiveInfoToPlayer(InitParams initParams)
+        public static void RegisterFixItem()           
         {
-            if (problem)
-                MessageToPlayer("Problem adding Advanced Teleport");
-            else
-                MessageToPlayer("Advanced Teleportation Module Initialized");
-        }
-
-        /// <summary>
-        /// Executes the advanced-teleport-kill console command
-        /// </summary>
-        public static string SaveOrNotToSave(string[] args)
-        {
-            if (args[0].CompareTo("yes") == 0)
-            {
-                shouldEraseAdvancedTeleportEffect = true;
-                return "Advanced Teleportation Kill Flag set to true. " + Environment.NewLine +
-                    "Next time you invoke the spell effect, it will erase itself. Save games made afterwards will NOT contain Advanced Teleportation data but WILL be compatible with game without Advanced Teleportation mod.";
-            }
-
-            if (args[0].CompareTo("no") == 0)
-            {
-                shouldEraseAdvancedTeleportEffect = false;
-                return "Advanced Teleportation Kill Flag set to false. " + Environment.NewLine +
-                    "Will be saving this effect. Save games made afterwards WILL contain Advanced Teleportation data but will NOT be compatible with game without Advanced Teleportation mod.";
-            }
-
-            return "advanced-teleportation-kill: unrecognized parameters, please use either 'advanced-teleport-kill yes' or 'advanced-teleport-kill no'.";
-        }
-        #endregion
-
-        #region Unleveled Enemies part
-
-        void Awake()
-        {
-            PlayerEnterExit.OnPreTransition += SetDungeon_OnPreTransition;
-            PlayerEnterExit.OnTransitionExterior += ClearData_OnTransitionExterior;
-
-            modInstance.IsReady = true; // set the mod's IsReady flag to true
-            Debug.Log("UnleveledEnemies.Awake method Finished");
-        }
-
-        private static void SetDungeon_OnPreTransition(PlayerEnterExit.TransitionEventArgs args)
-        {
-            region = GameManager.Instance.PlayerGPS.CurrentRegionIndex;
-            dungeon = (int)GameManager.Instance.PlayerGPS.CurrentLocation.MapTableData.DungeonType;
-            savedDQL = determineDungeonQuality();
-        }
-
-        private static void ClearData_OnTransitionExterior(PlayerEnterExit.TransitionEventArgs args)
-        {
-            dungeon = -1;
-            savedDQL = -1;
-        }
-
-        public static int determineDungeonQuality()
-        {
-            int[] modifierTable = { 0, 1, 2, 1, 0, -1, -2, -1 };
-
-            int modifierBasedOnHash = 0;
-            // this should be a modifier from -2 to +2 that is contingent on a hash from the name (or coordinates) of the dungeon and the time (like which quarter it is)
-
-
-            int currentYear = DaggerfallUnity.Instance.WorldTime.Now.Year;
-            int currentMonth = DaggerfallUnity.Instance.WorldTime.Now.Month;
-            int X = GameManager.Instance.PlayerGPS.CurrentMapPixel.X;
-            int Y = GameManager.Instance.PlayerGPS.CurrentMapPixel.Y;
-
-            int sequence = (X + Y + currentYear * 4 + currentMonth / 3) % 8;
-            modifierBasedOnHash = modifierTable[sequence];
-            // idea: fluctuating strength based on (X coord + Y coord + year + number) % 8
-
-            int DQL = 0;
-
-            switch (dungeon)
-            {
-                case (int)DFRegion.DungeonTypes.VolcanicCaves:
-                case (int)DFRegion.DungeonTypes.Coven:
-                    DQL = 21 + modifierBasedOnHash;
-                    break;
-                case (int)DFRegion.DungeonTypes.DesecratedTemple:
-                case (int)DFRegion.DungeonTypes.DragonsDen:
-                    DQL = 18 + modifierBasedOnHash;
-                    break;
-                case (int)DFRegion.DungeonTypes.BarbarianStronghold:
-                case (int)DFRegion.DungeonTypes.VampireHaunt:
-                    DQL = 15 + modifierBasedOnHash;
-                    break;
-                case (int)DFRegion.DungeonTypes.Crypt:
-                case (int)DFRegion.DungeonTypes.OrcStronghold:
-                    DQL = 12 + modifierBasedOnHash;
-                    break;
-                case (int)DFRegion.DungeonTypes.Laboratory:
-                case (int)DFRegion.DungeonTypes.HarpyNest:
-                    DQL = 10 + modifierBasedOnHash;
-                    break;
-                case (int)DFRegion.DungeonTypes.GiantStronghold:
-                case (int)DFRegion.DungeonTypes.NaturalCave:            // MT added, missing from Ralzar mod
-                    DQL = 5 + modifierBasedOnHash;
-                    break;
-                case (int)DFRegion.DungeonTypes.HumanStronghold:
-                case (int)DFRegion.DungeonTypes.RuinedCastle:
-                case (int)DFRegion.DungeonTypes.Prison:
-                    // this should be contingent on a hash from the name (or coordinates) of the dungeon and the time (like which quarter it is) - for now, setting a value of 8  
-                    DQL = 8 + modifierBasedOnHash;
-                    break;
-            }            // dungeon types not covered: ScorpionNest, SpiderNest, Mine, Cemetary
-
-            Debug.Log("Determining Dungeon Quality; Year=" + currentYear + " Month=" + currentMonth + " X=" + X + " Y=" + Y + " sequence=" + sequence + " DQModifier=" + modifierBasedOnHash + " DQ=" + DQL);
-            return DQL;
-        }
-
-        public static int dungeonQuality()
-        {
-            return savedDQL;
-        }
-
-        /// <summary>
-        /// Gives the player info on whether init was successful.
-        /// </summary>
-        [Invoke(StateManager.StateTypes.Game, 0)]
-        public static void ReportToUser(InitParams initParams)
-        {
-            DaggerfallUI.AddHUDText(greetingMessageToPlayerUnleveledEnemies);                    // display greeting message to player            
-        }
-        #endregion
-
-        #region Unleveled Spells part
-        /// <summary>
-        /// Makes an attempt to register new MMM spells with any custom spell effects.
-        /// The list of failures is returned in a string.
-        /// </summary>
-        /// <returns>
-        /// Returns the list of spells that failed to be registered to EntityEffectBroker.
-        /// </returns>
-        public static string RegisterSpellsWithBroker()
-        {
-            string returnString = "";
-
             // First register custom effect with broker
             // This will make it available to crafting stations supported by effect
 
@@ -350,11 +249,11 @@ namespace MTMMM
             // templateEffect.CurrentVariant = 0;
             if (!GameManager.Instance.EntityEffectBroker.RegisterEffectTemplate(templateEffect))
             {
-                returnString += "FixItem NOK";
-                return returnString;
+                Message("FixItem effect could not be registered");
+                return;
             }
 
-            returnString += "FixItem OK ";
+            Message("FixItem effect successfully registered");
 
             // Create effect settings for our custom spell
             // These are Chance, Duration, and Magnitude required by spell - usually seen in spellmaker
@@ -453,10 +352,232 @@ namespace MTMMM
             };
 
             // Register the offer
-            GameManager.Instance.EntityEffectBroker.RegisterCustomSpellBundleOffer(repairOffer);
+            GameManager.Instance.EntityEffectBroker.RegisterCustomSpellBundleOffer(repairOffer);            
+        }        
 
-            return returnString;
+        /// <summary>
+        /// Executes the advanced-teleport-kill console command
+        /// </summary>
+        public static string SaveOrNotToSave(string[] args)
+        {
+            if (args[0].CompareTo("yes") == 0)
+            {
+                shouldEraseAdvancedTeleportEffect = true;
+                return "Advanced Teleportation Kill Flag set to true. " + Environment.NewLine +
+                    "Next time you invoke the spell effect, it will erase itself. Save games made afterwards will NOT contain Advanced Teleportation data but WILL be compatible with game without Advanced Teleportation mod.";
+            }
+
+            if (args[0].CompareTo("no") == 0)
+            {
+                shouldEraseAdvancedTeleportEffect = false;
+                return "Advanced Teleportation Kill Flag set to false. " + Environment.NewLine +
+                    "Will be saving this effect. Save games made afterwards WILL contain Advanced Teleportation data but will NOT be compatible with game without Advanced Teleportation mod.";
+            }
+
+            return "advanced-teleportation-kill: unrecognized parameters, please use either 'advanced-teleport-kill yes' or 'advanced-teleport-kill no'.";
         }
         #endregion
+
+        #region Unleveled Enemies part
+            // some accelarator code too
+        void InitUnleveledEnemiesOnAwake()
+        {
+            PlayerEnterExit.OnPreTransition += SetDungeon_OnPreTransition;
+            PlayerEnterExit.OnTransitionExterior += ClearData_OnTransitionExterior;            
+        }
+
+        private static void SetDungeon_OnPreTransition(PlayerEnterExit.TransitionEventArgs args)
+        {
+            region = GameManager.Instance.PlayerGPS.CurrentRegionIndex;
+            dungeon = (int)GameManager.Instance.PlayerGPS.CurrentLocation.MapTableData.DungeonType;
+            savedDQL = determineDungeonQuality();
+        }
+
+        private static void ClearData_OnTransitionExterior(PlayerEnterExit.TransitionEventArgs args)
+        {
+            dungeon = -1;
+            savedDQL = -1;
+        }
+
+        public static int determineDungeonQuality()
+        {
+            int[] modifierTable = { 0, 1, 2, 1, 0, -1, -2, -1 };
+
+            int modifierBasedOnHash = 0;
+            // this should be a modifier from -2 to +2 that is contingent on a hash from the name (or coordinates) of the dungeon and the time (like which quarter it is)
+
+
+            int currentYear = DaggerfallUnity.Instance.WorldTime.Now.Year;
+            int currentMonth = DaggerfallUnity.Instance.WorldTime.Now.Month;
+            int X = GameManager.Instance.PlayerGPS.CurrentMapPixel.X;
+            int Y = GameManager.Instance.PlayerGPS.CurrentMapPixel.Y;
+
+            int sequence = (X + Y + currentYear * 4 + currentMonth / 3) % 8;
+            modifierBasedOnHash = modifierTable[sequence];
+            // idea: fluctuating strength based on (X coord + Y coord + year + number) % 8
+
+            int DQL = 0;
+
+            switch (dungeon)
+            {
+                case (int)DFRegion.DungeonTypes.VolcanicCaves:
+                case (int)DFRegion.DungeonTypes.Coven:
+                    DQL = 21 + modifierBasedOnHash;
+                    break;
+                case (int)DFRegion.DungeonTypes.DesecratedTemple:
+                case (int)DFRegion.DungeonTypes.DragonsDen:
+                    DQL = 18 + modifierBasedOnHash;
+                    break;
+                case (int)DFRegion.DungeonTypes.BarbarianStronghold:
+                case (int)DFRegion.DungeonTypes.VampireHaunt:
+                    DQL = 15 + modifierBasedOnHash;
+                    break;
+                case (int)DFRegion.DungeonTypes.Crypt:
+                case (int)DFRegion.DungeonTypes.OrcStronghold:
+                    DQL = 12 + modifierBasedOnHash;
+                    break;
+                case (int)DFRegion.DungeonTypes.Laboratory:
+                case (int)DFRegion.DungeonTypes.HarpyNest:
+                    DQL = 10 + modifierBasedOnHash;
+                    break;
+                case (int)DFRegion.DungeonTypes.GiantStronghold:
+                case (int)DFRegion.DungeonTypes.NaturalCave:            // MT added, missing from Ralzar mod
+                    DQL = 5 + modifierBasedOnHash;
+                    break;
+                case (int)DFRegion.DungeonTypes.HumanStronghold:
+                case (int)DFRegion.DungeonTypes.RuinedCastle:
+                case (int)DFRegion.DungeonTypes.Prison:
+                    // this should be contingent on a hash from the name (or coordinates) of the dungeon and the time (like which quarter it is) - for now, setting a value of 8  
+                    DQL = 8 + modifierBasedOnHash;
+                    break;
+            }            // dungeon types not covered: ScorpionNest, SpiderNest, Mine, Cemetary
+
+            Debug.Log("Determining Dungeon Quality; Year=" + currentYear + " Month=" + currentMonth + " X=" + X + " Y=" + Y + " sequence=" + sequence + " DQModifier=" + modifierBasedOnHash + " DQ=" + DQL);
+            return DQL;
+        }
+
+        public static int dungeonQuality()
+        {
+            return savedDQL;
+        }
+
+        /// <summary>
+        /// Gives the player info on whether init was successful.
+        /// </summary>
+        [Invoke(StateManager.StateTypes.Game, 0)]
+        public static void ReportToUser(InitParams initParams)                      // TODO: THINK OVER IF THIS IS NEEDED AND IN WHAT FORM AND WHAT NAMES
+        {
+            Message(greetingMessageToPlayerUnleveledEnemies);                    // display greeting message to player            
+        }
+        #endregion
+
+        #region Magic-related Rule Changes part
+        /// <summary>
+        /// Initialize the Magic-related Rule Changes parts
+        /// </summary>
+        public static void InitRuleChanges()
+        {
+            if (ourModSettings.GetValue<bool>("Magic-relatedRuleChanges", "UnleveledSpells"))
+            {
+                // starting to set up Unleveled Spells verbosity features
+                string verboseMessage = "Verbose";
+
+                // Setting MMMFormulaHelper verbosity features based on mod settings and adding the features turned on to a string to be displayed to the player  
+                if (MMMFormulaHelper.SendInfoMessagesOnPCSpellLevel = ourModSettings.GetValue<bool>("Magic-relatedRuleChanges", "PCLevel"))
+                    verboseMessage += " -- PC Spell Level";
+                if (MMMFormulaHelper.SendInfoMessagesOnNonPCSpellLevel = ourModSettings.GetValue<bool>("Magic-relatedRuleChanges", "NonPCLevel"))
+                    verboseMessage += " -- Non-PC Spell Level";
+
+                Message(verboseMessage);
+                // verbosity features set up
+
+                FormulaHelper.RegisterOverride(modInstance, "CalculateCasterLevel", (Func<DaggerfallEntity, IEntityEffect, int>)MMMFormulaHelper.GetSpellLevelForGame);
+            }
+
+            if (ourModSettings.GetValue<bool>("Magic-relatedRuleChanges", "MinimumMagickaCostOn"))
+            {
+                MMMFormulaHelper.castCostFloor = ourModSettings.GetValue<int>("Magic-relatedRuleChanges", "MinimumMagickaCost");
+                FormulaHelper.RegisterOverride(modInstance, "CalculateTotalEffectCosts", (Func<EffectEntry[], TargetTypes, DaggerfallEntity, bool, FormulaHelper.SpellCost>)MMMFormulaHelper.CalculateTotalEffectCosts);
+                Message("Minimum spell cost set to: "+ MMMFormulaHelper.castCostFloor);
+            }
+        }
+
+        public static void RegisterMTSpellBookWindow()
+        {
+            UIWindowFactory.RegisterCustomUIWindow(UIWindowType.SpellBook, typeof(MTSpellBookWindow));
+            MTSpellBookWindow.intelligenceRequirementForPurchasingSpells = ourModSettings.GetValue<bool>("Magic-relatedRuleChanges", "IntelligenceRequirementForPurchasingSpells");
+            Debug.Log("registered windows");    // TODO TODO
+        }
+        #endregion
+
+        #region TimeAccelarator part
+
+        static void InitTimeAcceleratorPart()
+        {
+            baseFixedDeltaTime = Time.fixedDeltaTime;
+            baseTimeScale = Time.timeScale;
+            Message("Base timescale = "+ baseTimeScale+"x.");
+            GameManager.OnEncounter += OnEncounter;
+        }
+
+        private static void SetTimeScale(int timeScale)
+        {
+            // Must set fixed delta time to scale the fixed (physics) updates as well.
+            Time.timeScale = timeScale * baseTimeScale;
+            Time.fixedDeltaTime = timeScale * baseFixedDeltaTime; // Default is 0.02 or 50/s
+        }
+
+        void TimeAcceleratorUpdate()
+        {       
+            if (InputManager.Instance.GetKeyDown(KeyCode.KeypadPlus))
+            {
+                if (GameManager.Instance.AreEnemiesNearby())
+                {
+                    timeAcceleratorMultiple = 1;
+                    SetTimeScale(timeAcceleratorMultiple);
+                    Message("Enemies nearby. Running at " + timeAcceleratorMultiple + "x normal speed (" + Time.timeScale + "x timescale).");
+                }
+                else
+                {
+                    timeAcceleratorMultiple = (timeAcceleratorMultiple / 4) * 4 + 4;
+                    SetTimeScale(timeAcceleratorMultiple);
+                    Message("Plus pushed: running at " + timeAcceleratorMultiple + "x normal speed (" + Time.timeScale + "x timescale).");
+                }
+            }
+                        // work in progress
+            int currentDiseaseCount = GameManager.Instance.PlayerEffectManager.DiseaseCount;
+            if (currentDiseaseCount != diseaseCount)
+            {
+                if (currentDiseaseCount > diseaseCount)
+                {                    
+                    SetTimeScale(1);
+                    Message("New disease detected, slowing back down : running at " + timeAcceleratorMultiple + "x normal speed (" + Time.timeScale + "x timescale).");
+                }
+                diseaseCount = currentDiseaseCount;
+            }
+
+            if (InputManager.Instance.GetKeyDown(KeyCode.KeypadMinus) )
+            {
+                timeAcceleratorMultiple = 1;
+                SetTimeScale(timeAcceleratorMultiple);
+                Message("Minus pushed: running at " + timeAcceleratorMultiple + "x normal speed (" + Time.timeScale + "x timescale).");
+            }
+
+            if ((GameManager.Instance.AreEnemiesNearby()&&timeAcceleratorMultiple>1))
+            {
+                timeAcceleratorMultiple = 1;
+                SetTimeScale(timeAcceleratorMultiple);
+                Message("Enemies nearby. Running at " + timeAcceleratorMultiple + "x normal speed (" + Time.timeScale + "x timescale).");
+            }
+        }
+
+        public static void OnEncounter()
+        {
+            SetTimeScale(1);
+            Message("Enemy encounter, slowing back down : running at " + timeAcceleratorMultiple + "x normal speed (" + Time.timeScale + "x timescale).");
+        }
+        #endregion
+
+
     }
 }

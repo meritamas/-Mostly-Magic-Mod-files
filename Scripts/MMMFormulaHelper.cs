@@ -27,12 +27,11 @@ namespace MTMMM
     {
         public static MTDebugMethod MMMFormulaHelperInfoMessage;
         public static bool SendInfoMessagesOnPCSpellLevel = false;
-        public static bool SendInfoMessagesOnNonPCSpellLevel = false;
-        public static bool SendInfoMessagesOnMagnitude = false;
-        public static bool SendInfoMessagesOnChance = false;       
-        public static bool SendInfoMessagesOnDuration = false;
+        public static bool SendInfoMessagesOnNonPCSpellLevel = false;        
 
         public static GetSpellLevelMethod GetSpellLevel = GetSpellLevel1;
+
+        public static int castCostFloor;
 
         /// <summary>
         /// Calculate the Chance of Success of an effect using the active Spell Level Calculation method. 
@@ -44,7 +43,7 @@ namespace MTMMM
                         
             int chanceToReturn = effect.Settings.ChanceBase + effect.Settings.ChancePlus * (int)Mathf.Floor(spellLevel / effect.Settings.ChancePerLevel);
 
-            if ((SendInfoMessagesOnChance) && (MMMFormulaHelperInfoMessage != null))
+            if (MMMFormulaHelperInfoMessage != null)
                 MMMFormulaHelperInfoMessage(effect.Properties.Key+". ChanceBase =" + effect.Settings.ChanceBase + ", ChancePlus=" + effect.Settings.ChancePlus + " :: " +
                     effect.Settings.ChanceBase + "+" + effect.Settings.ChancePlus + "*" + (int)Mathf.Floor(spellLevel / effect.Settings.ChancePerLevel) + " = " + chanceToReturn);
 
@@ -83,7 +82,7 @@ namespace MTMMM
             if (effect.ParentBundle.targetType != TargetTypes.CasterOnly)
                 magnitude = FormulaHelper.ModifyEffectAmount(effect, manager.EntityBehaviour.Entity, magnitude);
 
-            if ((SendInfoMessagesOnMagnitude) && (MMMFormulaHelperInfoMessage != null))
+            if (MMMFormulaHelperInfoMessage != null)
                 MMMFormulaHelperInfoMessage(messagePart + " (FINAL-MAG: "+ magnitude+")");
 
             return magnitude;
@@ -99,7 +98,7 @@ namespace MTMMM
             {
                 int durationToReturn = effect.Settings.DurationBase + effect.Settings.DurationPlus * (int)Mathf.Floor(spellLevel / effect.Settings.DurationPerLevel);
 
-                if ((SendInfoMessagesOnDuration) && (MMMFormulaHelperInfoMessage != null))
+                if (MMMFormulaHelperInfoMessage != null)
                     MMMFormulaHelperInfoMessage(effect.Properties.Key + ". DurationBase =" + effect.Settings.DurationBase + ", DurationPlus=" + effect.Settings.DurationPlus + " :: " +
                         effect.Settings.DurationBase + "+" + effect.Settings.DurationPlus + "*" + (int)Mathf.Floor(spellLevel / effect.Settings.DurationPerLevel) + " = " + durationToReturn);
 
@@ -107,7 +106,7 @@ namespace MTMMM
             }
             else
             {
-                if ((SendInfoMessagesOnDuration) && (MMMFormulaHelperInfoMessage != null))
+                if (MMMFormulaHelperInfoMessage != null)
                     MMMFormulaHelperInfoMessage(effect.Properties.Key + ". Duration = 0");
                 return 0;
             }
@@ -152,7 +151,7 @@ namespace MTMMM
             additionToLevel1 = 0;
             additionToLevel2 = 0;
 
-            while (pointsToDistribute > 0)
+            while (pointsLeft > 0)  // reported bug potentially solved - for reporting the bug and finding the problematic piece of code, thanks to chantling  
             {
                 if (level1 + additionToLevel1 < level2 + additionToLevel2)
                     additionToLevel1++;
@@ -239,6 +238,45 @@ namespace MTMMM
             }        
 
             return casterLevel;
+        }
+
+        /// <summary>
+        /// An override for Spell Casting Cost Calculation - the only differene there should be is that the floor will not 5, but a user-set value 
+        /// </summary>
+        public static FormulaHelper.SpellCost CalculateTotalEffectCosts(EffectEntry[] effectEntries, TargetTypes targetType, DaggerfallEntity casterEntity = null, bool minimumCastingCost = false)
+        {
+            FormulaHelper.SpellCost totalCost;
+            totalCost.goldCost = 0;
+            totalCost.spellPointCost = 0;
+
+            // Must have effect entries
+            if (effectEntries == null || effectEntries.Length == 0)
+                return totalCost;
+
+            // Add costs for each active effect slot
+            for (int i = 0; i < effectEntries.Length; i++)
+            {
+                if (string.IsNullOrEmpty(effectEntries[i].Key))
+                    continue;
+
+                FormulaHelper.SpellCost partialCost = FormulaHelper.CalculateEffectCosts(effectEntries[i], casterEntity);                 
+                totalCost.goldCost += partialCost.goldCost;
+                totalCost.spellPointCost += partialCost.spellPointCost;
+            }
+
+            // Multipliers for target type
+            totalCost.goldCost = FormulaHelper.ApplyTargetCostMultiplier(totalCost.goldCost, targetType);
+            totalCost.spellPointCost = FormulaHelper.ApplyTargetCostMultiplier(totalCost.spellPointCost, targetType);
+
+            // Set vampire spell cost
+            if (minimumCastingCost)
+                totalCost.spellPointCost = castCostFloor;
+
+            // Enforce minimum
+            if (totalCost.spellPointCost < castCostFloor)
+                totalCost.spellPointCost = castCostFloor;
+
+            return totalCost;
         }
     }
 }
