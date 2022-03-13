@@ -103,6 +103,14 @@ namespace MTMMM
         }
 
         /// <summary>
+        /// Silent method to send debug messages, meant to be used by MMMFormulaHelper - sends only to player.log, not to the HUD
+        /// </summary>
+        public static void SilentMessage (string message)
+        {
+            Message(message, false);
+        }
+
+        /// <summary>
         /// Method to send messages, depending on settings either to HUD or the Player, or both or neither
         /// </summary>
         public static void Message(string message, bool toHud=true, bool toPlayer=true, bool forceToHUD=false, bool forceToPlayer=false)
@@ -168,6 +176,7 @@ namespace MTMMM
             ourModSettings = modInstance.GetSettings();
 
             MMMFormulaHelper.MMMFormulaHelperInfoMessage = Message;
+            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage = SilentMessage;
         }        
 
         /// <summary>

@@ -21,11 +21,13 @@ using DaggerfallWorkshop.Game.MagicAndEffects;
 namespace MTMMM
 {
     public delegate void MTDebugMethod (string s);
+    public delegate void MTSilentDebugMethod (string s);
     public delegate int GetSpellLevelMethod(IEntityEffect effect);    
 
     public static class MMMFormulaHelper
     {
         public static MTDebugMethod MMMFormulaHelperInfoMessage;
+        public static MTSilentDebugMethod MMMFormulaHelperSilentInfoMessage;
         public static bool SendInfoMessagesOnPCSpellLevel = false;
         public static bool SendInfoMessagesOnNonPCSpellLevel = false;        
 
@@ -133,6 +135,8 @@ namespace MTMMM
                     return "THAU";                   
                 case DFCareer.MagicSkills.Illusion:
                     return "ILL";
+                case DFCareer.MagicSkills.None:
+                    return "NONE";
                 default:
                     return null;
             }
@@ -204,9 +208,18 @@ namespace MTMMM
             {
                 if (caster == GameManager.Instance.PlayerEntityBehaviour)
                 {
-                    PlayerEntity playerEntity = GameManager.Instance.PlayerEntity;                                   
-                      
-                    int skillLevel = (playerEntity.Skills.GetLiveSkillValue((DFCareer.Skills)effect.Properties.MagicSkill) - 9) / 3;          // (Skill-9)/3
+                    PlayerEntity playerEntity = GameManager.Instance.PlayerEntity;
+
+                    int skillLevel = caster.Entity.Level;       // base case, overriden every time the effect in question has a valid Magic Skill associated with it 
+
+                    if ((MMMFormulaHelperSilentInfoMessage != null) && (effect.Properties.MagicSkill == DFCareer.MagicSkills.None))
+                        MMMFormulaHelperSilentInfoMessage("Level being calculated for Player-cast spell effect with key '" + effect.Properties.Key + "', associated Magic Skill: '" + effect.Properties.MagicSkill+"'");
+                            // this is to adapt to a change in DFU core - it seems that in dungeons (at least in Privateer's Hold) the game seeks to determine the level for a PC-cast effect with key Passive-Specials;
+                            // for this Passive-Specials effect, effect.Properties.MagicSkill is equal to DFCareer.MagicSkills.None, in which case GetLiveSkillValue would throw an array index out of bounds exception
+                            // TODO: if all goes well, consider removing this debug line
+                    else
+                        skillLevel = (playerEntity.Skills.GetLiveSkillValue((DFCareer.Skills)effect.Properties.MagicSkill) - 9) / 3;          // (Skill-9)/3
+                    
                     int willpowerLevel = 10 + (playerEntity.Stats.LiveWillpower / 5);      // 10 + Willpower/5
 
                     int luckPointsToDistribute = (playerEntity.Stats.LiveLuck - 50) / 10; // (Luck - 50) / 10 
