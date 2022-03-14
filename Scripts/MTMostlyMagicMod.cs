@@ -557,8 +557,9 @@ namespace MTMMM
             int currentDiseaseCount = GameManager.Instance.PlayerEffectManager.DiseaseCount;
             if (currentDiseaseCount != diseaseCount)
             {
-                if (currentDiseaseCount > diseaseCount)
-                {                    
+                if ((currentDiseaseCount > diseaseCount) && (timeAcceleratorMultiple>1))
+                {
+                    timeAcceleratorMultiple = 1;
                     SetTimeScale(1);
                     Message("New disease detected, slowing back down : running at " + timeAcceleratorMultiple + "x normal speed (" + Time.timeScale + "x timescale).");
                 }
@@ -572,7 +573,7 @@ namespace MTMMM
                 Message("Minus pushed: running at " + timeAcceleratorMultiple + "x normal speed (" + Time.timeScale + "x timescale).");
             }
 
-            if ((GameManager.Instance.AreEnemiesNearby()&&timeAcceleratorMultiple>1))
+            if ((GameManager.Instance.AreEnemiesNearby())&&(timeAcceleratorMultiple>1))
             {
                 timeAcceleratorMultiple = 1;
                 SetTimeScale(timeAcceleratorMultiple);
@@ -582,8 +583,12 @@ namespace MTMMM
 
         public static void OnEncounter()
         {
-            SetTimeScale(1);
-            Message("Enemy encounter, slowing back down : running at " + timeAcceleratorMultiple + "x normal speed (" + Time.timeScale + "x timescale).");
+            if (timeAcceleratorMultiple > 1)
+            {
+                timeAcceleratorMultiple = 1;
+                SetTimeScale(1);
+                Message("Enemy encounter, slowing back down : running at " + timeAcceleratorMultiple + "x normal speed (" + Time.timeScale + "x timescale).");
+            }
         }
         #endregion
 
