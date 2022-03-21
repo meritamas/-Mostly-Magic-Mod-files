@@ -1,8 +1,16 @@
 // Project:         MeriTamas's (Mostly) Magic Mod for Daggerfall Unity (http://www.dfworkshop.net)
-// Copyright:       Copyright (C) 2021 meritamas
+// Copyright:       Copyright (C) 2022 meritamas
 // License:         MIT License (http://www.opensource.org/licenses/mit-license.php)
 // Author:          meritamas (meritamas@outlook.com)
-// credits to developers of base class
+
+// This class was based on the DaggerfallSpellBookWindow class which is part of the Daggerfall Tools For Unity project - many parts retained unchanged
+// Copyright:       Copyright (C) 2009-2020 Daggerfall Workshop
+// Web Site:        http://www.dfworkshop.net
+// License:         MIT License (http://www.opensource.org/licenses/mit-license.php)
+// Source Code:     https://github.com/Interkarma/daggerfall-unity
+// Original Author: Lypyl (lypyldf@gmail.com), Gavin Clayton (interkarma@dfworkshop.net)
+// Contributors:    Allofich, Hazelnut
+
 
 using UnityEngine;
 using DaggerfallWorkshop;

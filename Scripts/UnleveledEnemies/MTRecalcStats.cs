@@ -1,5 +1,5 @@
 // Project:         MeriTamas's (Mostly) Magic Mod for Daggerfall Unity (http://www.dfworkshop.net)
-// Copyright:       Copyright (C) 2021 meritamas
+// Copyright:       Copyright (C) 2022 meritamas
 // License:         MIT License (http://www.opensource.org/licenses/mit-license.php)
 // Author:          meritamas (meritamas@outlook.com)
 // Credits due to LypyL for the modding tutorial based on which this class was created.
@@ -32,6 +32,8 @@ namespace MTMMM
 {
     public class RecalcStats : MonoBehaviour
     {
+        static public bool extraStrongMonsters = false;
+
         // From EnemyEntity.cs -- originally from FALL.EXE offset 0x1C0F14
         static byte[] ImpSpells = { 0x07, 0x0A, 0x1D, 0x2C };
         static byte[] GhostSpells = { 0x22 };
@@ -48,7 +50,6 @@ namespace MTMMM
         static byte[] AncientLichSpells = { 0x08, 0x0A, 0x0E, 0x1D, 0x1F, 0x22, 0x3C };
         static byte[][] EnemyClassSpells = { FrostDaedraSpells, DaedrothSpells, OrcShamanSpells, VampireAncientSpells, DaedraLordSpells, LichSpells, AncientLichSpells };
                 
-
         DaggerfallEntityBehaviour entityBehaviour;
         EnemyEntity entity;
         PlayerEntity playerEntity;
@@ -150,10 +151,56 @@ namespace MTMMM
                 default: return ArmorMaterialTypes.Leather;   // possibly change in the future for debug purposes
             }
         }   
+        /*
+         *  Here comes the comment to how extra strong enemies are generated 
+             */
+        void SetExtraStrongMonsterStats()
+        {
+            if (Random.Range(0, 10) > 0)
+            {
+                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("This is not an extra strong " + entity.Career.Name + ".");
+                return;
+            }           // the code that follows set the distinc characteristics for extra strong monsters
+
+            int careerIndex = entity.CareerIndex;
+            int healthMultiplicator = Random.Range(5, 11);      // should be halved (so, from 2.5x to 5.5x)       
+            int spellPointMultiplicator = Random.Range(4, 8);   // should be halved (so, from 2x to 4x)
+            
+                    
+            switch (careerIndex)
+            {
+                case ((int)MonsterCareers.VampireAncient):
+                case ((int)MonsterCareers.AncientLich):
+                case ((int)MonsterCareers.DaedraLord):
+                    entity.MaxMagicka *= spellPointMultiplicator / 2;
+                    entity.CurrentMagicka = entity.MaxMagicka;              // setting new increased spellpoint number
+
+                    entity.Stats.SetPermanentStatValue(DFCareer.Stats.Intelligence, entity.Stats.PermanentIntelligence+ 20);               // increasing intelligence by 20
+                    entity.Stats.SetPermanentStatValue(DFCareer.Stats.Willpower, entity.Stats.PermanentWillpower + 20);                 // increasing willpower by 20
+                    goto case ((int)MonsterCareers.Werewolf);
+                /* TODO: here comes the code to boost certain skills (magic skills...) and possibly other characteristics for extra strong spellcasters */
+
+                case ((int)MonsterCareers.Werewolf):
+                case ((int)MonsterCareers.OrcWarlord):                    
+                    entity.MaxHealth *= healthMultiplicator / 2;                    
+                    entity.CurrentHealth = entity.MaxHealth;                // setting new increased health number
+
+                    entity.Stats.SetPermanentStatValue(DFCareer.Stats.Speed, entity.Stats.PermanentSpeed + 10);
+                    entity.Stats.SetPermanentStatValue(DFCareer.Stats.Endurance, entity.Stats.PermanentEndurance + 10);
+                    entity.Stats.SetPermanentStatValue(DFCareer.Stats.Agility, entity.Stats.PermanentAgility + 20);
+                    entity.Stats.SetPermanentStatValue(DFCareer.Stats.Strength, entity.Stats.PermanentStrength + 20);
+                    entity.Stats.SetPermanentStatValue(DFCareer.Stats.Luck, entity.Stats.PermanentLuck + 10);                      // increasing stats for all extra strong monsters
+
+                    /* TODO: here comes the code to boost certain skills (melee skills) and possibly other characteristics for all extra strong monsters */
+
+                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("An extra strong "+ entity.Career.Name+".");
+                    break;
+            }
+        }
 
         void Start()
         {
-            Debug.Log("MTRecalcStats.Start() has been called.");
+            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("MTRecalcStats.Start() has been called.");
 
             int tempRandomVar;
             int tempValue;
@@ -165,14 +212,14 @@ namespace MTMMM
 
             if (entityBehaviour==null)
             {
-                Debug.Log("entitybehaviour is null. exiting");
+                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("entitybehaviour is null. exiting");
                 return;
             }
 
             entity = entityBehaviour.Entity as EnemyEntity; // what if it is not Enemy?? answer: we would not be here. We are only part of the enemy prefab.
             if (entity == null)
             {
-                Debug.Log("entity is null. exiting");
+                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("entity is null. exiting");
                 return;
             }
 
@@ -180,7 +227,7 @@ namespace MTMMM
             EntityTypes entityType = entity.EntityType;
             int careerIndex = entity.CareerIndex;
 
-            Debug.Log("   mobileEnemy ID: "+mobileEnemy.ID+", entityType: "+entityType);
+            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("   mobileEnemy ID: "+mobileEnemy.ID+", entityType: "+entityType+", career name: "+ entity.Career.Name);
 
 
             /* here comes the code that does the work - but first, an insight into what we are up to
@@ -232,14 +279,35 @@ namespace MTMMM
              */
             
             if (entityType != EntityTypes.EnemyClass)
-            {                
-                Debug.Log("   Not a class enemy. Leaving it alone.");
-                return; // if it is a monster, we leave it alone
+            {
+                /* Printing important stats about the enemy for experimental and debug purposes*/            
+
+                string beginningArmorString = "Armor values - ";
+                for (int i = 0; i < entity.ArmorValues.Length; i++)
+                    beginningArmorString += entity.ArmorValues[i] + "  ";
+
+                if (extraStrongMonsters)
+                {
+                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("   Not a class enemy. Checking if it is an extra strong monster. Printing characteristics.");
+                    SetExtraStrongMonsterStats();                    
+                }
+                else
+                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("   Not a class enemy. Leaving it alone. Printing characteristics.");
+                            // if it is a monster, we either set it to be an extra strong one or we leave it alone
+
+                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage(beginningArmorString + "Level: "+ entity.Level+" MaxHealth: "+ entity.MaxHealth+ " MaxMagicka: " + entity.MaxMagicka+
+                    "  ATTRIBUTES.   WILL="+ entity.Stats.PermanentWillpower + "  INT="+ entity.Stats.PermanentIntelligence+"  SPD=" + entity.Stats.PermanentSpeed+
+                    "  LUCK="+ entity.Stats.PermanentLuck + "  AGI="+ entity.Stats.PermanentAgility + "  STR="+ entity.Stats.PermanentStrength +
+                    "  END="+ entity.Stats.PermanentEndurance + "  PER="+ entity.Stats.PermanentPersonality + "   RESISTANCES. Fire="+ entity.Resistances.PermanentFire+
+                    " Frost="+ entity.Resistances.PermanentFrost + " DiseaseOrPoison="+ entity.Resistances.PermanentDiseaseOrPoison+" Shock="+ entity.Resistances.PermanentShock+
+                    " Magic ="+ entity.Resistances.PermanentMagic);                
+
+                return; 
             }
 
             if (entity.CurrentMagicka<entity.MaxMagicka || entity.CurrentHealth<entity.MaxHealth)
             {
-                Debug.Log("   Entity already injured or has drained magicka. Not a new enemy. Aborting.");
+                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("   Entity already injured or has drained magicka. Not a new enemy. Aborting.");
                 return; // if it has already done some action, we leave it alone
             }
 
@@ -257,7 +325,7 @@ namespace MTMMM
             {
                 if (careerIndex != (int)MobileTypes.Knight_CityWatch)
                 {
-                    Debug.Log("Player is not inside a dungeon and the entity is NOT a townguard: level-setting by random encounters method.");
+                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Player is not inside a dungeon and the entity is NOT a townguard: level-setting by random encounters method.");
                     int effectivePlayerLevel = playerLevel;
                     if (effectivePlayerLevel > 23) effectivePlayerLevel = 23; // cap
                     tempRandomVar = UnityEngine.Random.Range(0, 10);
@@ -269,7 +337,7 @@ namespace MTMMM
                 }
                 else  // for townguards
                 {
-                    Debug.Log("Player is not inside a dungeon and the entity IS a townguard: setting level accordingly");
+                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Player is not inside a dungeon and the entity IS a townguard: setting level accordingly");
                     //      If townguard, we implement a method like we have for dungeons :: Town Guard Quality Level
                     //  This quality level is contingent on the size and prominance of the town:
                     //      Daggerfall, Wayrest and Sentinel: base level of 21, like the hardest of dungeons as per Ralzar
@@ -334,7 +402,7 @@ namespace MTMMM
                 tempRandomVar = UnityEngine.Random.Range(0, 10);                                        // TODO: revise code like above                
 
                 int dungeonQualityLevel = MTMostlyMagicMod.dungeonQuality();
-                Debug.Log("Player is inside a dungeon "+ MTMostlyMagicMod.dungeon+" of QL: "+ dungeonQualityLevel + " random number picked is "+ tempRandomVar);
+                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Player is inside a dungeon type "+ MTMostlyMagicMod.dungeon+" of QL: "+ dungeonQualityLevel + " random number picked is "+ tempRandomVar);
                 switch (tempRandomVar)
                 {
                     case 0:
@@ -361,12 +429,12 @@ namespace MTMMM
             if (excellenceRandomVar == 0)
             {
                 entity.Level -= 5;
-                Debug.Log("This is an exceptionally weak enemy - e.g. a trainee at this place.");
+                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("This is an exceptionally weak enemy - e.g. a trainee at this place.");
             }
             if (excellenceRandomVar == 19)
             {
                 entity.Level += 5;
-                Debug.Log("This is an exceptionally strong enemy - e.g. an elite or trainer at this place.");
+                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("This is an exceptionally strong enemy - e.g. an elite or trainer at this place.");
             }
 
             if (entity.Level < 1) entity.Level = 1;
@@ -388,7 +456,7 @@ namespace MTMMM
             // II. re-setting max health now                
             entity.MaxHealth = FormulaHelper.RollEnemyClassMaxHealth(entity.Level, entity.Career.HitPointsPerLevel);
 
-            Debug.Log("   Entity level +"+entity.Level+", Max Health set at "+entity.MaxHealth);
+            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("   Entity level +"+entity.Level+", Max Health set at "+entity.MaxHealth);
 
                 // III. now, re-setting skills :: a max of 150 to make the strongest ones more difficult
             short skillsLevel = (short)((entity.Level * 4) + 34);
@@ -402,7 +470,7 @@ namespace MTMMM
                 entity.Skills.SetPermanentSkillValue(i, skillsLevel);
             }
 
-            Debug.Log("   Skills set to " + skillsLevel);
+            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("   Skills set to " + skillsLevel);
 
                 // IV. now, re-setting spells and max. magicka
             if (mobileEnemy.CastsMagic)
@@ -456,8 +524,8 @@ namespace MTMMM
 
                     TextFile.Token[] tokens2 = ItemHelper.GetItemInfo(item2, DaggerfallUnity.Instance.TextProvider);
                     MacroHelper.ExpandMacros(ref tokens2, item2);
-                                        
-                    Debug.Log("Instead of "+oldItemString+" added and equipped " + tokens2[0].text + " (TI=" + item2.TemplateIndex + ")");
+
+                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Instead of "+oldItemString+" added and equipped " + tokens2[0].text + " (TI=" + item2.TemplateIndex + ")");
                                         
                 }
 
@@ -485,7 +553,7 @@ namespace MTMMM
                     TextFile.Token[] tokens2 = ItemHelper.GetItemInfo(item2, DaggerfallUnity.Instance.TextProvider);
                     MacroHelper.ExpandMacros(ref tokens2, item2);
 
-                    Debug.Log("Instead of " + oldItemString + " added and equipped " + tokens2[0].text + " (TI=" + item2.TemplateIndex + ") -- poisontype="+item2.poisonType);                    
+                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Instead of " + oldItemString + " added and equipped " + tokens2[0].text + " (TI=" + item2.TemplateIndex + ") -- poisontype="+item2.poisonType);                    
                 }
             }
                     //Debug.Log("   Unequipped and removed " + listOfItemsToDisposeOf.Count+" items");      // TODO: reevaluate if such line is needed + disposing of unneeded items     
@@ -518,7 +586,12 @@ namespace MTMMM
                     }
                 armorstring += entity.ArmorValues[i] + "  ";
             }
-            Debug.Log(armorstring);
+
+            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("ATTRIBUTES.  WILL=" + entity.Stats.PermanentWillpower + "  INT=" + entity.Stats.PermanentIntelligence + "  SPD=" + entity.Stats.PermanentSpeed +
+                    "  LUCK=" + entity.Stats.PermanentLuck + "  AGI=" + entity.Stats.PermanentAgility + "  STR=" + entity.Stats.PermanentStrength +
+                    "  END=" + entity.Stats.PermanentEndurance + "  PER=" + entity.Stats.PermanentPersonality + "  RESISTANCES. Fire=" + entity.Resistances.PermanentFire +
+                    " Frost=" + entity.Resistances.PermanentFrost + " DiseaseOrPoison=" + entity.Resistances.PermanentDiseaseOrPoison + " Shock=" + entity.Resistances.PermanentShock +
+                    " Magic =" + entity.Resistances.PermanentMagic + "   "+armorstring);
         }        
     }
 }

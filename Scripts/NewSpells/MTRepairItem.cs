@@ -1,5 +1,5 @@
 // Project:         MeriTamas's (Mostly) Magic Mod for Daggerfall Unity (http://www.dfworkshop.net)
-// Copyright:       Copyright (C) 2021 meritamas
+// Copyright:       Copyright (C) 2022 meritamas
 // License:         MIT License (http://www.opensource.org/licenses/mit-license.php)
 // Author:          meritamas (meritamas@outlook.com)
 // Credits due to the DFU developers based on the work of whom this class could be created.
@@ -40,7 +40,7 @@ namespace MTMMM
             properties.AllowedElements = EntityEffectBroker.ElementFlags_MagicOnly;
             properties.AllowedCraftingStations = MagicCraftingStations.SpellMaker;
             properties.MagicSkill = DFCareer.MagicSkills.Alteration;
-            properties.MagnitudeCosts = MakeEffectCosts(14, 28);       // TODO: check out what this means exactly
+            properties.MagnitudeCosts = MakeEffectCosts(14, 28);       
         }
 
         public bool IsValidForRepair(DaggerfallUnityItem item)      //

@@ -1,5 +1,5 @@
 // Project:         MeriTamas's (Mostly) Magic Mod for Daggerfall Unity (http://www.dfworkshop.net)
-// Copyright:       Copyright (C) 2021 meritamas
+// Copyright:       Copyright (C) 2022 meritamas
 // License:         MIT License (http://www.opensource.org/licenses/mit-license.php)
 // Author:          meritamas (meritamas@outlook.com)
 
@@ -29,7 +29,7 @@ using DaggerfallConnect;
 
 /*  The modules:
  *  - Unleveled Enemies
- *  - Magic-Related Rules Changes
+ *  - Magic-Related Rule Changes
  *  - New Effects and Spells
  *  - Quality of Life (currently to raise timescale while running to travel+train at the same time)
  *  - Experimental
@@ -127,9 +127,9 @@ namespace MTMMM
         public void Awake()
         {
             if (ourModSettings.GetValue<bool>("Magic-relatedRuleChanges", "IntelligenceRequirementForPurchasingSpells"))
-                RegisterMTSpellBookWindow();
+                RegisterMTSpellBookWindow();            // eventually will need restructuring: other preconditions could prompt the necessity of registering our SpellBookWindow 
 
-            if (ourModSettings.GetValue<bool>("NonMagicRuleChanges", "AlternativeSunLightDirections"))
+            if (ourModSettings.GetValue<bool>("NonMagicRuleChanges", "Earth-LikeSunLightDirections"))
             {
                 //  GameManager.Instance.SunlightManager.Angle = -40f;      this code does not work ; but this is where the code that does the job should go 
             }
@@ -143,7 +143,8 @@ namespace MTMMM
 
         void Update()
         {
-            TimeAcceleratorUpdate();
+            if (ourModSettings.GetValue<bool>("QualityOfLife", "ExerciseFastTravel"))
+                TimeAcceleratorUpdate();
         }
 
         #endregion
@@ -161,7 +162,8 @@ namespace MTMMM
             else
                 Message("Override for Teleport (Recall) (Advanced Teleportation) successfully registered.");
 
-            InitTimeAcceleratorPart();
+            if (ourModSettings.GetValue<bool>("QualityOfLife", "ExerciseFastTravel"))
+                InitTimeAcceleratorPart();
         }
 
         /// <summary>
@@ -188,7 +190,7 @@ namespace MTMMM
             go.AddComponent<MTMMM.RecalcStats>();
 
             GameObject go2 = new GameObject(modInstance.Title);
-            go2.AddComponent<MTMostlyMagicMod>();   // initializing the UnleveledLoot part
+            go2.AddComponent<MTMostlyMagicMod>();   // initializing the Unleveled and Extra Strong enemies part
 
             greetingMessageToPlayerUnleveledEnemies = "Enemy prefab changed successfully";
             Debug.Log("InitUnleveledEnemies module init method Finished");
@@ -202,7 +204,7 @@ namespace MTMMM
         public static void EndInit()
         {
             modInstance.IsReady = true;         // set the mod's IsReady flag to true
-            Debug.Log("(Mostly) Magic Mod Init Finished");
+            SilentMessage("(Mostly) Magic Mod Init Finished");
         }
 
         /// <summary>
@@ -218,6 +220,8 @@ namespace MTMMM
             if (ourModSettings.GetValue<bool>("UnleveledEnemies", "Main"))
                 InitUnleveledEnemiesOnStart();
 
+            RecalcStats.extraStrongMonsters = ourModSettings.GetValue<bool>("ExtraStrongMonsters", "Main");
+            SilentMessage("Extra Strong Monsters Enabled = " + RecalcStats.extraStrongMonsters);            
 
             InitRuleChanges();
             
@@ -233,18 +237,30 @@ namespace MTMMM
         /// </summary>
         public static void InitNewSpellsAndEffects()
         {
-            if (ourModSettings.GetValue<bool>("NewEffectsAndSpells", "AdvancedTeleporation"))
+            if (ourModSettings.GetValue<bool>("HighMagic", "AdvancedTeleporation-MultipleAnchorsPossible"))
             {
                 BaseEntityEffect ourTeleportEffect = new MTTeleport();
 
                 problem = !GameManager.Instance.EntityEffectBroker.RegisterEffectTemplate(ourTeleportEffect, true);
-                ConsoleCommandsDatabase.RegisterCommand("advanced-teleport-kill", SaveOrNotToSave);
-            }
-                        
 
+                if (problem)
+                    SilentMessage("MTTeleport effect could not be registered.");
+                else
+                    SilentMessage("MTTeleport effect successfully registered.");
+
+                ConsoleCommandsDatabase.RegisterCommand("advanced-teleport-kill", SaveOrNotToSave);
+            }                                 
 
             if (ourModSettings.GetValue<bool>("NewEffectsAndSpells", "FixItem"))
                 RegisterFixItem();
+
+            if (ourModSettings.GetValue<bool>("NewEffectsAndSpells", "ConjurationCreation"))
+                RegisterConjurationCreationEffectsAndSpells();
+
+
+            if (ourModSettings.GetValue<bool>("NewEffectsAndSpells-OtherMods", "ClimatesCalories"))
+                RegisterClimatesCaloriesEffectsAndSpells(); // We'll test for C&C where we need to and prepare the code for the case C&C is not present 
+
         }
 
 
@@ -315,28 +331,10 @@ namespace MTMMM
             // Register the offer
             GameManager.Instance.EntityEffectBroker.RegisterCustomSpellBundleOffer(minorRepairOffer);
 
-            EffectSettings effectSettings2 = new EffectSettings()
-            {
-                MagnitudeBaseMin = 1,
-                MagnitudeBaseMax = 1,
-                MagnitudePlusMin = 2,
-                MagnitudePlusMax = 2,
-                MagnitudePerLevel = 1,
-            };
-
-            // Create an EffectEntry
-            // This links the effect key with settings
-            // Each effect entry in bundle needs its own settings - most spells only have a single effect
-            EffectEntry effectEntry2 = new EffectEntry()
-            {
-                Key = templateEffect.Properties.Key,
-                Settings = effectSettings2,
-            };
-
-            // Create a custom spell bundle
-            // This is a portable version of the spell for other systems
-            // For example, every spell in the player's spellbook is a bundle
-            // Bundle target and elements settings should follow effect requirements
+            EffectSettings effectSettings2 = new EffectSettings()   {   MagnitudeBaseMin = 1, MagnitudeBaseMax = 1, MagnitudePlusMin = 2, MagnitudePlusMax = 2, MagnitudePerLevel = 1,      };
+           
+            EffectEntry effectEntry2 = new EffectEntry()            {   Key = templateEffect.Properties.Key,         Settings = effectSettings2,          };
+                        
             EffectBundleSettings repairSpell = new EffectBundleSettings()
             {
                 Version = EntityEffectBroker.CurrentSpellVersion,
@@ -347,22 +345,144 @@ namespace MTMMM
                 IconIndex = 1,
                 Effects = new EffectEntry[] { effectEntry2 },
             };
-
-            // Create a custom spell offer
-            // This informs other systems if they can use this bundle
+            
             EntityEffectBroker.CustomSpellBundleOffer repairOffer = new EntityEffectBroker.CustomSpellBundleOffer()
             {
-                Key = "Reparo-CustomOffer",                           // This key is for the offer itself and must be unique
-                Usage = EntityEffectBroker.CustomSpellBundleOfferUsage.SpellsForSale, //|               Available in spells for sale
-                                                                                      //EntityEffectBroker.CustomSpellBundleOfferUsage.CastWhenUsedEnchantment |    // Available for "cast on use" enchantments
-                                                                                      //EntityEffectBrokerCustomSpellBundleOfferUsage.CastWhenHeldEnchantment,    // Available for "cast on held" enchantments
-                BundleSetttings = repairSpell //,                          The spell bundle created earlier
-                //EnchantmentCost = 250,                                          // Cost to use spell at item enchanter if enabled
+                Key = "Reparo-CustomOffer",                           
+                Usage = EntityEffectBroker.CustomSpellBundleOfferUsage.SpellsForSale, 
+                                                                                     
+                BundleSetttings = repairSpell               
             };
-
-            // Register the offer
+           
             GameManager.Instance.EntityEffectBroker.RegisterCustomSpellBundleOffer(repairOffer);            
-        }        
+        }
+
+
+        public static void RegisterConjurationCreationEffectsAndSpells()
+        {
+                    // first, registering the override to DFU's CreateItem, our MTSummonSimpleItem - a Conjuration effect that will create permanent items, but won't always succeed
+            BaseEntityEffect registeredEffect = new MTSummonSimpleItem();
+
+            problem = !GameManager.Instance.EntityEffectBroker.RegisterEffectTemplate(registeredEffect, true);
+
+            if (problem)
+                Message("MTSummonSimpleItem effect could not be registered.");
+            else
+                SilentMessage("MTSummonSimpleItem effect successfully registered.");
+
+                    // now, to register MTMultiplyProvisions - a simple Conjuration effect that will based on player choice multiply either the water in your waterskin (refill), your rations (regenerate food) or arrows (summon) 
+
+            registeredEffect = new MTMultiplyProvisions();
+
+            problem = !GameManager.Instance.EntityEffectBroker.RegisterEffectTemplate(registeredEffect, true);
+
+            if (problem)
+                Message("MTMultiplyProvisions effect could not be registered.");
+            else
+                SilentMessage("MTMultiplyProvisions effect successfully registered.");
+
+                    // now, registering Abundantia, an MTMultiplyProvisions spell
+            EffectSettings effectSettings = new EffectSettings() { MagnitudeBaseMin = 1, MagnitudeBaseMax = 1, MagnitudePlusMin = 1, MagnitudePlusMax = 1, MagnitudePerLevel = 1, };
+            EffectEntry effectEntry = new EffectEntry() { Key = registeredEffect.Properties.Key, Settings = effectSettings, };
+            EffectBundleSettings effectBundleSettings = new EffectBundleSettings()
+            {
+                Version = EntityEffectBroker.CurrentSpellVersion,
+                BundleType = BundleTypes.Spell,
+                TargetType = TargetTypes.CasterOnly,
+                ElementType = ElementTypes.Magic,
+                Name = "Abundantia",
+                IconIndex = 2,
+                Effects = new EffectEntry[] { effectEntry },
+            };
+            EntityEffectBroker.CustomSpellBundleOffer registeredOffer = new EntityEffectBroker.CustomSpellBundleOffer()
+            {
+                Key = "Abundantia-CustomOffer",
+                Usage = EntityEffectBroker.CustomSpellBundleOfferUsage.SpellsForSale,
+                BundleSetttings = effectBundleSettings
+            };
+            GameManager.Instance.EntityEffectBroker.RegisterCustomSpellBundleOffer(registeredOffer);
+        }
+
+        public static void RegisterClimatesCaloriesEffectsAndSpells()
+        {
+                    // first registering the MTUmbrella effect 
+            BaseEntityEffect ourRegisteredEffect = new MTUmbrella();
+
+            problem = !GameManager.Instance.EntityEffectBroker.RegisterEffectTemplate(ourRegisteredEffect, true);
+
+            if (problem)
+                Message("MTUmbrella effect could not be registered.");
+            else
+                SilentMessage("MTUmbrella effect successfully registered.");
+
+                    // now, registering two standardized MTUmbrella spells: Brevi Tempore Sine Pluvia and Sine Pluvia
+                    // first, Brevi Tempore Sine Pluvia
+            EffectSettings effectSettings = new EffectSettings()  { DurationBase = 2, DurationPlus = 1, DurationPerLevel = 1, };
+            EffectEntry effectEntry = new EffectEntry()  {   Key = ourRegisteredEffect.Properties.Key, Settings = effectSettings, };
+            EffectBundleSettings effectBundleSettings = new EffectBundleSettings()            {
+                Version = EntityEffectBroker.CurrentSpellVersion,
+                BundleType = BundleTypes.Spell,
+                TargetType = TargetTypes.CasterOnly,
+                ElementType = ElementTypes.Magic,
+                Name = "Brevi Sine Pluvia",
+                IconIndex = 2,
+                Effects = new EffectEntry[] { effectEntry },            };
+            EntityEffectBroker.CustomSpellBundleOffer registeredOffer = new EntityEffectBroker.CustomSpellBundleOffer()            {
+                Key = "BreviTemporeSinePluvia-CustomOffer",                           
+                Usage = EntityEffectBroker.CustomSpellBundleOfferUsage.SpellsForSale,                                                                                       
+                BundleSetttings = effectBundleSettings                    };
+            GameManager.Instance.EntityEffectBroker.RegisterCustomSpellBundleOffer(registeredOffer);
+            
+                    // second  Sine Pluvia
+            effectSettings = new EffectSettings() { DurationBase = 1, DurationPlus = 3, DurationPerLevel = 1, };
+            effectEntry = new EffectEntry() { Key = ourRegisteredEffect.Properties.Key, Settings = effectSettings, };
+            EffectBundleSettings umbrellaSpell = new EffectBundleSettings()            {
+                Version = EntityEffectBroker.CurrentSpellVersion,
+                BundleType = BundleTypes.Spell,
+                TargetType = TargetTypes.CasterOnly,
+                ElementType = ElementTypes.Magic,
+                Name = "Sine Pluvia",
+                IconIndex = 2,
+                Effects = new EffectEntry[] { effectEntry },            };
+            EntityEffectBroker.CustomSpellBundleOffer umbrellaOffer = new EntityEffectBroker.CustomSpellBundleOffer()            {
+                Key = "SinePluvia-CustomOffer",                           
+                Usage = EntityEffectBroker.CustomSpellBundleOfferUsage.SpellsForSale, 
+                BundleSetttings = umbrellaSpell,             };
+            GameManager.Instance.EntityEffectBroker.RegisterCustomSpellBundleOffer(umbrellaOffer);
+
+                        // now, registering the MTDryClothes effect 
+            ourRegisteredEffect = new MTDryClothes();
+
+            problem = !GameManager.Instance.EntityEffectBroker.RegisterEffectTemplate(ourRegisteredEffect, true);
+
+            if (problem)
+                Message("MTDryClothes effect could not be registered.");
+            else
+                SilentMessage("MTDryClothes effect successfully registered.");
+
+                    // now, registering a modest 'cloak-drier' spell, Ariditas
+            effectSettings = new EffectSettings() { MagnitudeBaseMin = 10, MagnitudeBaseMax = 10, MagnitudePlusMin = 4, MagnitudePlusMax = 6, MagnitudePerLevel = 1, };
+            effectEntry = new EffectEntry() { Key = ourRegisteredEffect.Properties.Key, Settings = effectSettings, };
+            effectBundleSettings = new EffectBundleSettings()
+            {
+                Version = EntityEffectBroker.CurrentSpellVersion,
+                BundleType = BundleTypes.Spell,
+                TargetType = TargetTypes.CasterOnly,
+                ElementType = ElementTypes.Magic,
+                Name = "Ariditas",
+                IconIndex = 2,
+                Effects = new EffectEntry[] { effectEntry },
+            };
+            registeredOffer = new EntityEffectBroker.CustomSpellBundleOffer()
+            {
+                Key = "Ariditas-CustomOffer",
+                Usage = EntityEffectBroker.CustomSpellBundleOfferUsage.SpellsForSale,
+                BundleSetttings = effectBundleSettings
+            };
+            GameManager.Instance.EntityEffectBroker.RegisterCustomSpellBundleOffer(registeredOffer);
+
+            // TODO: code to register RepelWater
+        }
 
         /// <summary>
         /// Executes the advanced-teleport-kill console command
@@ -508,6 +628,13 @@ namespace MTMMM
                 MMMFormulaHelper.castCostFloor = ourModSettings.GetValue<int>("Magic-relatedRuleChanges", "MinimumMagickaCost");
                 FormulaHelper.RegisterOverride(modInstance, "CalculateTotalEffectCosts", (Func<EffectEntry[], TargetTypes, DaggerfallEntity, bool, FormulaHelper.SpellCost>)MMMFormulaHelper.CalculateTotalEffectCosts);
                 Message("Minimum spell cost set to: "+ MMMFormulaHelper.castCostFloor);
+                    // consider registering the replacement for CalculateEffectCosts here
+            }
+
+            if (true)           // TODO: a condition that would be true if the base game has been edited to use my skill&attribute system
+            {
+                FormulaHelper.RegisterOverride(modInstance, "CalculateEffectCosts", (Func<IEntityEffect, EffectSettings, DaggerfallEntity, FormulaHelper.SpellCost>)MMMFormulaHelper.CalculateEffectCosts);
+                Message("Minimum effect cost override routine registered - effectt cost decrease for magic skill levels above 95 will now be slower.");
             }
         }
 
@@ -525,7 +652,7 @@ namespace MTMMM
         {
             baseFixedDeltaTime = Time.fixedDeltaTime;
             baseTimeScale = Time.timeScale;
-            Message("Base timescale = "+ baseTimeScale+"x.");
+            SilentMessage("Initializing Time Accelerator Module. Base timescale = "+ baseTimeScale+"x.");
             GameManager.OnEncounter += OnEncounter;
         }
 
@@ -537,7 +664,9 @@ namespace MTMMM
         }
 
         void TimeAcceleratorUpdate()
-        {       
+        {
+            SilentMessage("We are updating the time accelerator module.");
+
             if (InputManager.Instance.GetKeyDown(KeyCode.KeypadPlus))
             {
                 if (GameManager.Instance.AreEnemiesNearby())
