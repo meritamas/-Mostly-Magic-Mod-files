@@ -112,10 +112,11 @@ namespace MTMMM
             uiManager.PushWindow(itemPicker);
         }
 
-        private void ItemPicker_OnItemPicked(int index, string itemString)      // TODO: put the repair mechanic here
+        private void ItemPicker_OnItemPicked(int index, string itemString)      
         {
             DaggerfallUnityItem itemToRepair = validRepairItems[index];
-            int maximumRepairAmount = 50 * MMMFormulaHelper.GetSpellMagnitude(this, manager);
+            int repairPerMagnitude = UnityEngine.Random.Range(47, 52);      // this ensures that the spell does not restore the exact same amount of condition points each time
+            int maximumRepairAmount = repairPerMagnitude * MMMFormulaHelper.GetSpellMagnitude(this, manager);
             /*  about the coefficient :: The basic idea is as follows - some basic calculations and then reverse-engineer from that
              *  with the same parameters, it should replenish the condition of a Steel Cuirass like the Stamina spell replenishes Fatigue for an "average character"
              *  concretely: at LVL 15, Stamina (1-8 + 2/LVL) recharges about 35, an "average character" for our purposes could be one with END 70 and STR 70, so max fatigue = 140
@@ -128,6 +129,8 @@ namespace MTMMM
             int repairAmount = itemToRepair.maxCondition - itemToRepair.currentCondition;
             if (maximumRepairAmount < repairAmount) repairAmount = maximumRepairAmount;
             itemToRepair.currentCondition += repairAmount;
+
+            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("MTRepairItem : " + repairAmount + "condition points returned to item " + itemToRepair.LongName);
 
             // Close picker and unsubscribe event
             UserInterfaceManager uiManager = DaggerfallUI.Instance.UserInterfaceManager;

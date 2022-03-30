@@ -239,10 +239,10 @@ namespace MTMMM
                     casterLevel = Mathf.Max(1, Mathf.Min(skillLevel + luckPointsToSkillLevel, willpowerLevel+luckPointsToWillpowerLevel));
 
                     if ((SendInfoMessagesOnPCSpellLevel) && (MMMFormulaHelperInfoMessage != null))
-                        MMMFormulaHelperInfoMessage("Player-cast " + effect.Properties.Key + " effect (" + relevantSkill + ") level calculated: " + " OVERALL = " + casterLevel +
+                        MMMFormulaHelperSilentInfoMessage("Player-cast " + effect.Properties.Key + " effect (" + relevantSkill + ") level calculated: " + " OVERALL = " + casterLevel +
                         ", SKILL: " + skillLevel+ ((luckPointsToSkillLevel>=0) ? "+" : "") +luckPointsToSkillLevel +
                         ", WILLPOWER = " + willpowerLevel+ ((luckPointsToWillpowerLevel >= 0) ? "+" : "") + luckPointsToWillpowerLevel+"");
-                }
+                }               // made player-cast effect info messages silent (found them to be quite disturbing during gameplay) - enemy spells will still be visible on the HUd too if relevant option ticked
                 else
                 {
                     casterLevel = caster.Entity.Level;
@@ -397,6 +397,19 @@ namespace MTMMM
 
             //Debug.LogFormat("Costs: gold {0} spellpoints {1}", finalGoldCost, finalSpellPointCost);
             return effectCost;
+        }
+
+        // Generates health for enemy classes based on level and class
+        public static int RollEnemyClassMaxHealth(int level, int hitPointsPerLevel, System.Random ourNumberGenerator)
+        { 
+            const int baseHealth = 10;
+            int maxHealth = baseHealth;
+
+            for (int i = 0; i < level; i++)
+            {
+                maxHealth += ourNumberGenerator.Next(1, hitPointsPerLevel + 1);
+            }
+            return maxHealth;
         }
     }
 }

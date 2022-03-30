@@ -257,7 +257,10 @@ namespace MTMMM
                     else
                         item = ItemBuilder.CreateWomensClothing(WomensClothing.Plain_robes, race);
                     break;
-            }           
+            }
+
+            int conditionPercentage = UnityEngine.Random.Range(45, 100);                    // conjuration is about getting an already existing item to go to you. these items will not always be brand new
+            item.currentCondition = item.maxCondition * item.ConditionPercentage / 100;
 
             return item;
         }

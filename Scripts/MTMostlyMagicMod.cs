@@ -160,7 +160,7 @@ namespace MTMMM
             if (problem)
                 Message("Problem adding Advanced Teleport", true, true, true, true);
             else
-                Message("Override for Teleport (Recall) (Advanced Teleportation) successfully registered.");
+                SilentMessage("Override for Teleport (Recall) (Advanced Teleportation) successfully registered.");
 
             if (ourModSettings.GetValue<bool>("QualityOfLife", "ExerciseFastTravel"))
                 InitTimeAcceleratorPart();
@@ -173,7 +173,7 @@ namespace MTMMM
         /// </summary>
         public static void StartInit(string modTitle)
         {
-            Debug.Log("(Mostly) Magic Mod Init Started");
+            Debug.Log("MT MMM: (Mostly) Magic Mod Init Started");
             modInstance = ModManager.Instance.GetMod(modTitle);
             ourModSettings = modInstance.GetSettings();
 
@@ -192,8 +192,8 @@ namespace MTMMM
             GameObject go2 = new GameObject(modInstance.Title);
             go2.AddComponent<MTMostlyMagicMod>();   // initializing the Unleveled and Extra Strong enemies part
 
-            greetingMessageToPlayerUnleveledEnemies = "Enemy prefab changed successfully";
-            Debug.Log("InitUnleveledEnemies module init method Finished");
+            greetingMessageToPlayerUnleveledEnemies = "Unleveled + Extra Strong Enemies in a position to work (Enemy prefab changed successfully)";
+            SilentMessage("InitUnleveledEnemies module init method Finished");
         }        
 
         /// <summary>
@@ -581,7 +581,7 @@ namespace MTMMM
                     break;
             }            // dungeon types not covered: ScorpionNest, SpiderNest, Mine, Cemetary
 
-            Debug.Log("Determining Dungeon Quality; Year=" + currentYear + " Month=" + currentMonth + " X=" + X + " Y=" + Y + " sequence=" + sequence + " DQModifier=" + modifierBasedOnHash + " DQ=" + DQL);
+            SilentMessage("Determining Dungeon Quality; Year=" + currentYear + " Month=" + currentMonth + " X=" + X + " Y=" + Y + " sequence=" + sequence + " DQModifier=" + modifierBasedOnHash + " DQ=" + DQL);
             return DQL;
         }
 
@@ -634,7 +634,7 @@ namespace MTMMM
             if (true)           // TODO: a condition that would be true if the base game has been edited to use my skill&attribute system
             {
                 FormulaHelper.RegisterOverride(modInstance, "CalculateEffectCosts", (Func<IEntityEffect, EffectSettings, DaggerfallEntity, FormulaHelper.SpellCost>)MMMFormulaHelper.CalculateEffectCosts);
-                Message("Minimum effect cost override routine registered - effectt cost decrease for magic skill levels above 95 will now be slower.");
+                Message("Minimum effect cost override routine registered - effect cost decrease for magic skill levels above 95 will now be slower.");
             }
         }
 
@@ -642,7 +642,7 @@ namespace MTMMM
         {
             UIWindowFactory.RegisterCustomUIWindow(UIWindowType.SpellBook, typeof(MTSpellBookWindow));
             MTSpellBookWindow.intelligenceRequirementForPurchasingSpells = ourModSettings.GetValue<bool>("Magic-relatedRuleChanges", "IntelligenceRequirementForPurchasingSpells");
-            Debug.Log("registered windows");    // TODO TODO
+            SilentMessage("registered windows");    // TODO TODO
         }
         #endregion
 
@@ -665,7 +665,7 @@ namespace MTMMM
 
         void TimeAcceleratorUpdate()
         {
-            SilentMessage("We are updating the time accelerator module.");
+            // SilentMessage("We are updating the time accelerator module.");   // this should not be needed any more
 
             if (InputManager.Instance.GetKeyDown(KeyCode.KeypadPlus))
             {

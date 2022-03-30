@@ -12,7 +12,6 @@
  * For now, it seems to work as intended.
 */
 
-
 using System.Collections.Generic;
 using DaggerfallConnect.Arena2;
 using UnityEngine;
@@ -53,10 +52,11 @@ namespace MTMMM
         DaggerfallEntityBehaviour entityBehaviour;
         EnemyEntity entity;
         PlayerEntity playerEntity;
+        System.Random ourNumberGenerator;
 
-        static int getItemMaterialRandomDeviation()
+        int getItemMaterialRandomDeviation()
         {
-            int randomNumber = UnityEngine.Random.Range(0, 1024);
+            int randomNumber = ourNumberGenerator.Next(0, 1024);
 
             if (randomNumber < 512) return 1;
             if (randomNumber < 768) return 2;
@@ -78,7 +78,7 @@ namespace MTMMM
             return categoryNumber;
         }
 
-        static int getRandomItemMaterial(int entityLevel)
+        int getRandomItemMaterial(int entityLevel)
         {/*
             What these things should mean.
             If there is no deviation from the central level, then the chances of getting [a lesser material, exactly that material, a higher material] should be [33, 34, 33]
@@ -91,7 +91,7 @@ namespace MTMMM
             int[] maximumLows = {   47,    33,    26 };
             int[] minimumHighs = {  47+27, 33+34, 26+27};      
 
-            int smallerEqualOrLarger = UnityEngine.Random.Range(0, 100);        
+            int smallerEqualOrLarger = ourNumberGenerator.Next(0, 100);        
             int closestLevelCategory = (entityLevel -1) / 3 + 1;               // LVL 2 is the center level of the first category (LVL 1-3), LVL 5 of the 2nd category (LVL 4-6) etc
             int deviationFromCategoryCenter = ((entityLevel-1) % 3)-1;      // e.g. LVL1 is -1 from the category center (LVL2), LVL6 is +1 from the category center (LVL 5) etc
                                         // there is a simpler way to do the latter task: subtract from center level that can be calculated from the result of the first calc. 
@@ -154,36 +154,37 @@ namespace MTMMM
         /*
          *  Here comes the comment to how extra strong enemies are generated 
              */
-        void SetExtraStrongMonsterStats()
+        void SetExtraStrongMonsterStats(bool isThisANewEnemy)
         {
-            if (Random.Range(0, 10) > 0)
+            if (ourNumberGenerator.Next(0, 10) > 0)
             {
-                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("This is not an extra strong " + entity.Career.Name + ".");
+                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("This is definitely not an extra strong " + entity.Career.Name + ".");
                 return;
             }           // the code that follows set the distinc characteristics for extra strong monsters
 
             int careerIndex = entity.CareerIndex;
-            int healthMultiplicator = Random.Range(5, 11);      // should be halved (so, from 2.5x to 5.5x)       
-            int spellPointMultiplicator = Random.Range(4, 8);   // should be halved (so, from 2x to 4x)
-            
-                    
+            int healthMultiplicator = ourNumberGenerator.Next(5, 11);      // should be halved (so, from 2.5x to 5.5x)       
+            int spellPointMultiplicator = ourNumberGenerator.Next(4, 8);   // should be halved (so, from 2x to 4x)            
+
             switch (careerIndex)
             {
                 case ((int)MonsterCareers.VampireAncient):
                 case ((int)MonsterCareers.AncientLich):
                 case ((int)MonsterCareers.DaedraLord):
-                    entity.MaxMagicka *= spellPointMultiplicator / 2;
-                    entity.CurrentMagicka = entity.MaxMagicka;              // setting new increased spellpoint number
+                    entity.MaxMagicka = (entity.MaxMagicka*spellPointMultiplicator) / 2;
+                    if (isThisANewEnemy)
+                            entity.CurrentMagicka = entity.MaxMagicka;              // setting new increased spellpoint number - only if running for the first time
 
                     entity.Stats.SetPermanentStatValue(DFCareer.Stats.Intelligence, entity.Stats.PermanentIntelligence+ 20);               // increasing intelligence by 20
                     entity.Stats.SetPermanentStatValue(DFCareer.Stats.Willpower, entity.Stats.PermanentWillpower + 20);                 // increasing willpower by 20
-                    goto case ((int)MonsterCareers.Werewolf);
-                /* TODO: here comes the code to boost certain skills (magic skills...) and possibly other characteristics for extra strong spellcasters */
+                    /* TODO: here comes the code to boost certain skills (magic skills...) and possibly other characteristics for extra strong spellcasters */
+                    goto case ((int)MonsterCareers.Werewolf);                
 
                 case ((int)MonsterCareers.Werewolf):
                 case ((int)MonsterCareers.OrcWarlord):                    
-                    entity.MaxHealth *= healthMultiplicator / 2;                    
-                    entity.CurrentHealth = entity.MaxHealth;                // setting new increased health number
+                    entity.MaxHealth = (entity.MaxHealth*healthMultiplicator) / 2;
+                    if (isThisANewEnemy)
+                        entity.CurrentHealth = entity.MaxHealth;                // setting new increased health number - but only if we are running for the first time
 
                     entity.Stats.SetPermanentStatValue(DFCareer.Stats.Speed, entity.Stats.PermanentSpeed + 10);
                     entity.Stats.SetPermanentStatValue(DFCareer.Stats.Endurance, entity.Stats.PermanentEndurance + 10);
@@ -195,13 +196,88 @@ namespace MTMMM
 
                     MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("An extra strong "+ entity.Career.Name+".");
                     break;
+                default:
+                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Not an extra strong " + entity.Career.Name + ".");
+                    break;
             }
         }
 
+        string[] skillNameStrings = { "Medical", "Etiquette", "Streetwise", "Jumping", "Orcish", "Harpy", "Giantish", "Dragonish", "Nymph", "Daedric", "Spriggan", "Centaurian", "Impish", "Lockpicking",
+            "Mercantile", "Pickpocket", "Stealth", "Swimming", "Climbing", "Backstabbing", "Dodging", "Running", "Destruction", "Restoration", "Illusion", "Alteration", "Thaumaturgy", "Mysticism",
+            "ShortBlade", "LongBlade", "HandToHand", "Axe", "BluntWeapon", "Archery", "CriticalStrike"};
+
+        string[] equipSlotStrings = { "Amulet0", "Amulet1", "Bracelet0", "Bracelet1", "Ring0", "Ring1", "Bracer0", "Bracer1", "Mark0", "Mark1", "Crystal0", "Crystal1", "Head",
+            "RightArm", "Cloak1", "LeftArm", "Cloak2", "ChestClothes", "ChestArmor", "RightHand", "Gloves", "LeftHand", "Unknown1", "LegsArmor", "LegsClothes", "Unknown2", "Feet" };
+
+        void EntityCharacteristicsToLog (string title)
+        {
+            string armorString = "\tArmor values: ";
+            for (int i = 0; i < entity.ArmorValues.Length; i++)
+                armorString += entity.ArmorValues[i] + "  ";
+
+            string skillString = "\tSkill values.";
+            for (int i = 0; i < (int)DFCareer.Skills.Count; i++)         // potential problem if number of skills increased (array-out-of-bounds exception)
+            {
+                skillString += skillNameStrings[i] + "=" + entity.Skills.GetPermanentSkillValue(i) + "  ";
+                if (i % 7 == 6)
+                    skillString += System.Environment.NewLine + "\t\t";
+            }
+
+            
+            string itemString = "\tItems in inventory."+ System.Environment.NewLine;
+            if (entity.Items != null)
+            {
+                int numberOfItems = entity.Items.Count;
+                if (numberOfItems == 0)
+                    itemString += "\t\tNone" + System.Environment.NewLine;
+                else
+                {
+                    itemString += "\t\tnumberOfItems=" + numberOfItems+System.Environment.NewLine;
+                    for (int i = 0; i < numberOfItems; i++)
+                    {
+                        DaggerfallUnityItem item = entity.Items.GetItem(i);
+                        if (item != null)
+                            itemString += "\t\tTemplateIndex=" + item.TemplateIndex + ", shortName: '"+ item.shortName+"', ItemName = '" + item.ItemName + "', LongName='" + item.LongName + "', isIngredient=" + item.IsIngredient + System.Environment.NewLine;
+                        else
+                            itemString += "\t\tItem #" + i + " is NULL." + System.Environment.NewLine;
+
+                        //  itemString += "\t\tItem #" + i + " is NOT null" + System.Environment.NewLine;
+                    }
+                }
+            }
+            else
+                itemString += "\t\t entity.Items is null." + System.Environment.NewLine;
+            
+
+            itemString += "\tItems equipped." + System.Environment.NewLine;
+            for (int i = (int)EquipSlots.Amulet0; i <= (int)EquipSlots.Feet; i++)   
+            {                
+                DaggerfallUnityItem item = entity.ItemEquipTable.GetItem((EquipSlots)i);
+                if (!(item is null))
+                {
+                    TextFile.Token[] tokens = ItemHelper.GetItemInfo(item, DaggerfallUnity.Instance.TextProvider);
+                    MacroHelper.ExpandMacros(ref tokens, item);
+                    string currentItemString = tokens[0].text;
+                    itemString += "\t\t" + equipSlotStrings[i] + ": " + currentItemString + ", TemplateIndex="+ item.TemplateIndex+ System.Environment.NewLine; ;
+                }                    
+            }
+
+            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage(title + " Career.Name: " + entity.Career.Name + System.Environment.NewLine +
+                "\tLevel: " + entity.Level + "  Health: " + entity.CurrentHealth + "/" + entity.MaxHealth + "  SpellPoints: " + entity.CurrentMagicka + "/" + entity.MaxMagicka + System.Environment.NewLine +
+                "\tAttributes.  Willpower=" + entity.Stats.PermanentWillpower + "  Intelligence=" + entity.Stats.PermanentIntelligence + "  Speed=" + entity.Stats.PermanentSpeed +
+                "  Luck=" + entity.Stats.PermanentLuck + "  Agility=" + entity.Stats.PermanentAgility + "  Strength=" + entity.Stats.PermanentStrength +
+                "  Endurance=" + entity.Stats.PermanentEndurance + "  Personality=" + entity.Stats.PermanentPersonality + System.Environment.NewLine +
+                skillString + System.Environment.NewLine +
+                "\tResistances. Fire=" + entity.Resistances.PermanentFire + " Frost=" + entity.Resistances.PermanentFrost + " DiseaseOrPoison=" + entity.Resistances.PermanentDiseaseOrPoison +
+                " Shock=" + entity.Resistances.PermanentShock + " Magic =" + entity.Resistances.PermanentMagic + System.Environment.NewLine +
+                itemString + System.Environment.NewLine + 
+                armorString ); 
+        }        
+
         void Start()
         {
-            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("MTRecalcStats.Start() has been called.");
-
+            int X = GameManager.Instance.PlayerGPS.CurrentMapPixel.X;
+            int Y = GameManager.Instance.PlayerGPS.CurrentMapPixel.Y;
             int tempRandomVar;
             int tempValue;
             playerEntity = GameManager.Instance.PlayerEntity;
@@ -212,23 +288,47 @@ namespace MTMMM
 
             if (entityBehaviour==null)
             {
-                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("entitybehaviour is null. exiting");
+                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("RecalcStats.Start() has been called. Entitybehaviour is null. exiting");
                 return;
             }
 
             entity = entityBehaviour.Entity as EnemyEntity; // what if it is not Enemy?? answer: we would not be here. We are only part of the enemy prefab.
             if (entity == null)
             {
-                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("entity is null. exiting");
+                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("RecalcStats.Start() has been called. Entity is null. exiting");
                 return;
-            }
+            }            
 
             MobileEnemy mobileEnemy = entity.MobileEnemy;
             EntityTypes entityType = entity.EntityType;
-            int careerIndex = entity.CareerIndex;
+            int careerIndex = entity.CareerIndex;            
+            
+            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("==========================================================================================" + System.Environment.NewLine +
+                "RecalcStats.Start() has been called. MobileEnemy ID: " + mobileEnemy.ID + ", entityType: " + entityType + ", career name: " + entity.Career.Name);
+            
+            EntityCharacteristicsToLog("Enemy characteristics BEFORE any changes made. "); 
 
-            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("   mobileEnemy ID: "+mobileEnemy.ID+", entityType: "+entityType+", career name: "+ entity.Career.Name);
+            bool isThisANewEnemy = true;            // will be able to judge only after setting MaximumHealth - then, if CurrentHealth is lower, then it is not a new enemy             
+            int randomSeed = 0;
 
+            if (entity.Items != null)
+            {
+                int numberOfItems = entity.Items.Count;
+                if (numberOfItems > 0)
+                {
+                    for (int i = 0; i < numberOfItems; i++)
+                    {
+                        DaggerfallUnityItem item = entity.Items.GetItem(i);
+                        if (item != null)
+                            randomSeed += item.TemplateIndex;
+                    }
+                }
+            }                       
+
+            randomSeed += mobileEnemy.ID + X * Y;                   // for now,  mobileEnemy.ID + map pixel coordinates + item templateindexes should do the job                        
+            ourNumberGenerator = new System.Random(randomSeed);     // eventually planning a more versatile way of doing things - currently each monster in the same map pixel of the same kind will have the exact same stats
+
+            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("X="+X+", Y="+Y+ ", random seed="+randomSeed);            
 
             /* here comes the code that does the work - but first, an insight into what we are up to
              *
@@ -277,39 +377,27 @@ namespace MTMMM
              * - magicka and spells
              * - equipment
              */
-            
+
             if (entityType != EntityTypes.EnemyClass)
             {
-                /* Printing important stats about the enemy for experimental and debug purposes*/            
-
-                string beginningArmorString = "Armor values - ";
-                for (int i = 0; i < entity.ArmorValues.Length; i++)
-                    beginningArmorString += entity.ArmorValues[i] + "  ";
+                /* Printing important stats about the enemy for experimental and debug purposes*/                
 
                 if (extraStrongMonsters)
                 {
-                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("   Not a class enemy. Checking if it is an extra strong monster. Printing characteristics.");
-                    SetExtraStrongMonsterStats();                    
+                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("   Not a class enemy. Checking if it is an extra strong monster.");
+                    SetExtraStrongMonsterStats(isThisANewEnemy);                    
                 }
                 else
-                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("   Not a class enemy. Leaving it alone. Printing characteristics.");
-                            // if it is a monster, we either set it to be an extra strong one or we leave it alone
+                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("   Not a class enemy. Leaving it alone.");
+                            // if it is a monster, we either set it to be an extra strong one or we leave it alone                      
 
-                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage(beginningArmorString + "Level: "+ entity.Level+" MaxHealth: "+ entity.MaxHealth+ " MaxMagicka: " + entity.MaxMagicka+
-                    "  ATTRIBUTES.   WILL="+ entity.Stats.PermanentWillpower + "  INT="+ entity.Stats.PermanentIntelligence+"  SPD=" + entity.Stats.PermanentSpeed+
-                    "  LUCK="+ entity.Stats.PermanentLuck + "  AGI="+ entity.Stats.PermanentAgility + "  STR="+ entity.Stats.PermanentStrength +
-                    "  END="+ entity.Stats.PermanentEndurance + "  PER="+ entity.Stats.PermanentPersonality + "   RESISTANCES. Fire="+ entity.Resistances.PermanentFire+
-                    " Frost="+ entity.Resistances.PermanentFrost + " DiseaseOrPoison="+ entity.Resistances.PermanentDiseaseOrPoison+" Shock="+ entity.Resistances.PermanentShock+
-                    " Magic ="+ entity.Resistances.PermanentMagic);                
+                if (entity.CurrentHealth == entity.MaxHealth)
+                    entity.MaxHealth += 1;        // increasing MaxHealth in order to signal that this enemy's items have already been processed (entity.CurrentHealth<entity.MaxHealth check)
+                                              // nearly every particular of enemies seems to be thrown away during save/load - MaxHealth and CurrentHealth seem to be exceptions, these are loaded back unchanged                      
+                EntityCharacteristicsToLog("Enemy monster characteristics AFTER changes made. ");
 
                 return; 
-            }
-
-            if (entity.CurrentMagicka<entity.MaxMagicka || entity.CurrentHealth<entity.MaxHealth)
-            {
-                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("   Entity already injured or has drained magicka. Not a new enemy. Aborting.");
-                return; // if it has already done some action, we leave it alone
-            }
+            }              
 
             // careerindex and stats already set - they are okay that way for now
                     // TODO: if super strong enemies will have increased stats, the code could come here
@@ -328,11 +416,11 @@ namespace MTMMM
                     MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Player is not inside a dungeon and the entity is NOT a townguard: level-setting by random encounters method.");
                     int effectivePlayerLevel = playerLevel;
                     if (effectivePlayerLevel > 23) effectivePlayerLevel = 23; // cap
-                    tempRandomVar = UnityEngine.Random.Range(0, 10);
+                    tempRandomVar = ourNumberGenerator.Next(0, 10);
                     if (tempRandomVar == 0)
-                        entity.Level = playerLevel - 10 + UnityEngine.Random.Range(0, 6);
+                        entity.Level = playerLevel - 10 + ourNumberGenerator.Next(0, 6);
                     else if (tempRandomVar == 9)
-                        entity.Level = playerLevel + 4 + UnityEngine.Random.Range(0, 6);
+                        entity.Level = playerLevel + 4 + ourNumberGenerator.Next(0, 6);
                     else entity.Level = playerLevel - 4 + tempRandomVar - 1;
                 }
                 else  // for townguards
@@ -378,9 +466,8 @@ namespace MTMMM
                     int modifierBasedOnHash = 0;       // this should be a modifier from -2 to +2 that is contingent on a hash from the coordinates of the place and the time (like which quarter it is)
                     
                     int currentYear = DaggerfallUnity.Instance.WorldTime.Now.Year;
-                    int currentMonth = DaggerfallUnity.Instance.WorldTime.Now.Month;
-                    int X = GameManager.Instance.PlayerGPS.CurrentMapPixel.X;
-                    int Y = GameManager.Instance.PlayerGPS.CurrentMapPixel.Y;
+                    int currentMonth = DaggerfallUnity.Instance.WorldTime.Now.Month;                
+                            // X and Y already defined at the beginning of the method
 
                     int sequence = (X + Y + currentYear * 4 + currentMonth / 3) % 8;
                     modifierBasedOnHash = modifierTable[sequence];
@@ -388,7 +475,7 @@ namespace MTMMM
                     townGuardLevel += modifierBasedOnHash;
                                                                                         
                     int[] individualModifierTable = { -2, -1, -1, 0, 0, 0, 0, +1, +1, +2 };
-                    townGuardLevel += individualModifierTable[UnityEngine.Random.Range(0, 10)];     // apply the individual fluctuation
+                    townGuardLevel += individualModifierTable[ourNumberGenerator.Next(0, 10)];     // apply the individual fluctuation
                                                                                                                     // TODO: double check all this and add debug messages
 
                     entity.Level = townGuardLevel;                                                                                                      
@@ -399,7 +486,7 @@ namespace MTMMM
                 /* If we are inside a dungeon, then the enemy level should depend on dungeon quality level.
                  * 10% DQL-2, 20% DQL-1, 40% DQL, 20% DQL+1, 10% DQL+2                 */   
             {
-                tempRandomVar = UnityEngine.Random.Range(0, 10);                                        // TODO: revise code like above                
+                tempRandomVar = ourNumberGenerator.Next(0, 10);                                        // TODO: revise code like above                
 
                 int dungeonQualityLevel = MTMostlyMagicMod.dungeonQuality();
                 MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Player is inside a dungeon type "+ MTMostlyMagicMod.dungeon+" of QL: "+ dungeonQualityLevel + " random number picked is "+ tempRandomVar);
@@ -425,7 +512,7 @@ namespace MTMMM
                 }
             }
                     // adding/subtracting levels for exceptionally strong/weak enemies - you have a small change to encounter such foes anywhere
-            int excellenceRandomVar = UnityEngine.Random.Range(0, 20);
+            int excellenceRandomVar = ourNumberGenerator.Next(0, 20);
             if (excellenceRandomVar == 0)
             {
                 entity.Level -= 5;
@@ -451,12 +538,21 @@ namespace MTMMM
              *              The base range of levels should be dependent on the town.
              *              Top category: Daggerfall, Wayrest, Sentinel ;; other capitals ;; cities ;; towns ;; smaller places ----- perhaps like dungeons :: "town quality level"
              *              As always: exceptionally talented foes applies for city guards as well. So, maximum guard level should be LVL30=21+2(TQL dev)+2 (individ. dev.) + 5 (exceptional talent). 
-                */                        
+                */
 
-            // II. re-setting max health now                
-            entity.MaxHealth = FormulaHelper.RollEnemyClassMaxHealth(entity.Level, entity.Career.HitPointsPerLevel);
+            // II. re-setting max health now
 
-            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("   Entity level +"+entity.Level+", Max Health set at "+entity.MaxHealth);
+            isThisANewEnemy = (entity.CurrentHealth == entity.MaxHealth);       // setting a flag so we know later that we are running for the first time on the given enemy
+            
+            entity.MaxHealth = MMMFormulaHelper.RollEnemyClassMaxHealth(entity.Level, entity.Career.HitPointsPerLevel, ourNumberGenerator);                              
+
+            if (isThisANewEnemy)
+            {
+                entity.CurrentHealth = entity.MaxHealth;    // TODO: only do this if running for the first time
+                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("\tEntity level +" + entity.Level + ", Max Health set to " + entity.MaxHealth + ", since running for the first time, also set Current Health to " + entity.CurrentHealth);
+            }
+            else
+                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("\tEntity level +" + entity.Level + ", Max Health set to " + entity.MaxHealth+ ", since not running for the first time in the given enemy, leaving Current Health alone");
 
                 // III. now, re-setting skills :: a max of 150 to make the strongest ones more difficult
             short skillsLevel = (short)((entity.Level * 4) + 34);
@@ -470,7 +566,7 @@ namespace MTMMM
                 entity.Skills.SetPermanentSkillValue(i, skillsLevel);
             }
 
-            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("   Skills set to " + skillsLevel);
+            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("   Skills set to " + skillsLevel);            
 
                 // IV. now, re-setting spells and max. magicka
             if (mobileEnemy.CastsMagic)
@@ -480,8 +576,12 @@ namespace MTMMM
                     spellListLevel = 6;
                 entity.SetEnemySpells(EnemyClassSpells[spellListLevel]);    // involves setting magic skills to 80     
                                                                             // also involves setting the max. magicka to level*10+100, but with the new level
-                short spellSkillLevel = 80;                                                                                                             // TODO: could reevaluate in the future('extra strong enemies') // TODO                                                    
-
+                                                                            // currently does not appear to involve random number generation
+                if (isThisANewEnemy)
+                    entity.CurrentMagicka = entity.MaxMagicka;          // setting currentmagicka to equal maxmagicka - only if running on a given enemy for the first time
+                                                                    // TODO: see if enemy spell points is actually saved by game..., if not, this would better run each time
+                
+                short spellSkillLevel = 80;                                                               // TODO: could reevaluate in the future('extra strong enemies')                                                  
                 entity.Skills.SetPermanentSkillValue(DFCareer.Skills.Destruction, spellSkillLevel);
                 entity.Skills.SetPermanentSkillValue(DFCareer.Skills.Restoration, spellSkillLevel);
                 entity.Skills.SetPermanentSkillValue(DFCareer.Skills.Illusion, spellSkillLevel);
@@ -500,98 +600,99 @@ namespace MTMMM
              * Then, re-generate the same equipment, only of different materials.
              * In the future, I plan to expand this code to add further potent, partly magic equipment to 'super strong enemies'                                        // TODO       */
 
-            for (int i = (int)EquipSlots.Head; i <= (int)EquipSlots.Feet; i++)       // does it include boots? ::  added equal, should be correct now ::                   TODO: check if it is correct this way.
+            if (isThisANewEnemy)
+                // resetting equipemnt only needed if we are running on the given enemy for the first time
             {
-                DaggerfallUnityItem item = entity.ItemEquipTable.GetItem((EquipSlots)i);
-                if (item != null && item.ItemGroup == ItemGroups.Armor)
+                for (int i = (int)EquipSlots.Head; i <= (int)EquipSlots.Feet; i++)       // does it include boots? ::  added equal, should be correct now ::                   TODO: check if it is correct this way.
                 {
-                    TextFile.Token[] tokens = ItemHelper.GetItemInfo(item, DaggerfallUnity.Instance.TextProvider);
-                    MacroHelper.ExpandMacros(ref tokens, item);
-                    string oldItemString = tokens[0].text + " (TI=" + item.TemplateIndex + ")";
+                    DaggerfallUnityItem item = entity.ItemEquipTable.GetItem((EquipSlots)i);
+                    if (item != null && item.ItemGroup == ItemGroups.Armor)
+                    {
+                        TextFile.Token[] tokens = ItemHelper.GetItemInfo(item, DaggerfallUnity.Instance.TextProvider);
+                        MacroHelper.ExpandMacros(ref tokens, item);
+                        string oldItemString = tokens[0].text + " (TI=" + item.TemplateIndex + ")";
 
-                    entity.ItemEquipTable.UnequipItem(item);
+                        entity.ItemEquipTable.UnequipItem(item);
 
-                    int groupIndex = item.GroupIndex; // not sure this is necessary
-                    DaggerfallUnityItem item2 = ItemBuilder.CreateItem(ItemGroups.Armor, item.TemplateIndex);
+                        int groupIndex = item.GroupIndex; // not sure this is necessary
+                        DaggerfallUnityItem item2 = ItemBuilder.CreateItem(ItemGroups.Armor, item.TemplateIndex);
 
-                    ItemBuilder.ApplyArmorSettings(item2, playerEntity.Gender, playerEntity.Race, getArmorMaterialFromNumber(getRandomItemMaterial(entity.Level)), item.CurrentVariant);
-                                                    // town guards can have better than steel        // TODO: re-evaluate if any penalty is appropriate for town guards;; probably so (classic has a cap: no better than steel)
-                    item2.currentCondition = item2.maxCondition * item.ConditionPercentage / 100;
-
-                    entity.Items.RemoveItem(item);
-                    entity.Items.AddItem(item2);
-                    entity.ItemEquipTable.EquipItem(item2, true, false);
-
-                    TextFile.Token[] tokens2 = ItemHelper.GetItemInfo(item2, DaggerfallUnity.Instance.TextProvider);
-                    MacroHelper.ExpandMacros(ref tokens2, item2);
-
-                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Instead of "+oldItemString+" added and equipped " + tokens2[0].text + " (TI=" + item2.TemplateIndex + ")");
-                                        
-                }
-
-                if (item != null && item.ItemGroup == ItemGroups.Weapons)
-                {
-                    TextFile.Token[] tokens = ItemHelper.GetItemInfo(item, DaggerfallUnity.Instance.TextProvider);
-                    MacroHelper.ExpandMacros(ref tokens, item);
-                    string oldItemString = tokens[0].text + " (TI=" + item.TemplateIndex + ")";
-
-                    entity.ItemEquipTable.UnequipItem(item);
-
-                    int groupIndex = item.GroupIndex;       // not sure this is necessary
-                    DaggerfallUnityItem item2 = ItemBuilder.CreateItem(ItemGroups.Weapons, item.TemplateIndex);
-
-                    ItemBuilder.ApplyWeaponMaterial(item2, getWeaponMaterialFromNumber(getRandomItemMaterial(entity.Level)));
+                        ItemBuilder.ApplyArmorSettings(item2, playerEntity.Gender, playerEntity.Race, getArmorMaterialFromNumber(getRandomItemMaterial(entity.Level)), item.CurrentVariant);
                         // town guards can have better than steel        // TODO: re-evaluate if any penalty is appropriate for town guards;; probably so (classic has a cap: no better than steel)
-                    item2.currentCondition = item2.maxCondition * item.ConditionPercentage / 100;
+                        item2.currentCondition = item2.maxCondition * item.ConditionPercentage / 100;
 
-                    item2.poisonType = item.poisonType;     // retain poison
+                        entity.Items.RemoveItem(item);
+                        entity.Items.AddItem(item2);
+                        entity.ItemEquipTable.EquipItem(item2, true, false);
 
-                    entity.Items.RemoveItem(item);
-                    entity.Items.AddItem(item2);
-                    entity.ItemEquipTable.EquipItem(item2, true, false);
+                        TextFile.Token[] tokens2 = ItemHelper.GetItemInfo(item2, DaggerfallUnity.Instance.TextProvider);
+                        MacroHelper.ExpandMacros(ref tokens2, item2);
 
-                    TextFile.Token[] tokens2 = ItemHelper.GetItemInfo(item2, DaggerfallUnity.Instance.TextProvider);
-                    MacroHelper.ExpandMacros(ref tokens2, item2);
+                        MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Instead of " + oldItemString + " added and equipped " + tokens2[0].text + " (TI=" + item2.TemplateIndex + ")");
 
-                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Instead of " + oldItemString + " added and equipped " + tokens2[0].text + " (TI=" + item2.TemplateIndex + ") -- poisontype="+item2.poisonType);                    
+                    }
+
+                    if (item != null && item.ItemGroup == ItemGroups.Weapons)
+                    {
+                        TextFile.Token[] tokens = ItemHelper.GetItemInfo(item, DaggerfallUnity.Instance.TextProvider);
+                        MacroHelper.ExpandMacros(ref tokens, item);
+                        string oldItemString = tokens[0].text + " (TI=" + item.TemplateIndex + ")";
+
+                        entity.ItemEquipTable.UnequipItem(item);
+
+                        int groupIndex = item.GroupIndex;       // not sure this is necessary
+                        DaggerfallUnityItem item2 = ItemBuilder.CreateItem(ItemGroups.Weapons, item.TemplateIndex);
+
+                        ItemBuilder.ApplyWeaponMaterial(item2, getWeaponMaterialFromNumber(getRandomItemMaterial(entity.Level)));
+                        // town guards can have better than steel        // TODO: re-evaluate if any penalty is appropriate for town guards;; probably so (classic has a cap: no better than steel)
+                        item2.currentCondition = item2.maxCondition * item.ConditionPercentage / 100;
+
+                        item2.poisonType = item.poisonType;     // retain poison
+
+                        entity.Items.RemoveItem(item);
+                        entity.Items.AddItem(item2);
+                        entity.ItemEquipTable.EquipItem(item2, true, false);
+
+                        TextFile.Token[] tokens2 = ItemHelper.GetItemInfo(item2, DaggerfallUnity.Instance.TextProvider);
+                        MacroHelper.ExpandMacros(ref tokens2, item2);
+
+                        MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Instead of " + oldItemString + " added and equipped " + tokens2[0].text + " (TI=" + item2.TemplateIndex + ") -- poisontype=" + item2.poisonType);
+                    }
                 }
-            }
-                    //Debug.Log("   Unequipped and removed " + listOfItemsToDisposeOf.Count+" items");      // TODO: reevaluate if such line is needed + disposing of unneeded items     
+                //Debug.Log("   Unequipped and removed " + listOfItemsToDisposeOf.Count+" items");      // TODO: reevaluate if such line is needed + disposing of unneeded items     
 
-            // recalculating armor stats
-            // Initialize armor values to 100 (no armor)
-            for (int i = 0; i < entity.ArmorValues.Length; i++)
-            {
-                entity.ArmorValues[i] = 100;
-            }
-                // Calculate armor values from equipment
-            for (int i = (int)EquipSlots.Head; i < (int)EquipSlots.Feet; i++)
-            {
-                DaggerfallUnityItem item = entity.ItemEquipTable.GetItem((EquipSlots)i);
-                if (item != null && item.ItemGroup == ItemGroups.Armor)
+                // recalculating armor stats
+                // Initialize armor values to 100 (no armor)
+                for (int i = 0; i < entity.ArmorValues.Length; i++)
                 {
-                    entity.UpdateEquippedArmorValues(item, true);
+                    entity.ArmorValues[i] = 100;
                 }
-            }
+                // Calculate armor values from equipment
+                for (int i = (int)EquipSlots.Head; i < (int)EquipSlots.Feet; i++)
+                {
+                    DaggerfallUnityItem item = entity.ItemEquipTable.GetItem((EquipSlots)i);
+                    if (item != null && item.ItemGroup == ItemGroups.Armor)
+                    {
+                        entity.UpdateEquippedArmorValues(item, true);
+                    }
+                }
 
-            string armorstring = "Armor values - ";
                 // Comments to the code originally from Interkarma:
                 // Clamp to maximum armor value of 60. In classic this also applies for monsters.
-               // Note: Classic sets the value to 60 if it is > 50, which seems like an oversight.
-            for (int i = 0; i < entity.ArmorValues.Length; i++)
-            {
-                if (entity.ArmorValues[i] > 60)
-                    {
-                    entity.ArmorValues[i] = 60;
-                    }
-                armorstring += entity.ArmorValues[i] + "  ";
+                // Note: Classic sets the value to 60 if it is > 50, which seems like an oversight.
+                for (int i = 0; i < entity.ArmorValues.Length; i++)
+                {
+                    if (entity.ArmorValues[i] > 60)
+                        entity.ArmorValues[i] = 60;
+                }                
             }
 
-            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("ATTRIBUTES.  WILL=" + entity.Stats.PermanentWillpower + "  INT=" + entity.Stats.PermanentIntelligence + "  SPD=" + entity.Stats.PermanentSpeed +
-                    "  LUCK=" + entity.Stats.PermanentLuck + "  AGI=" + entity.Stats.PermanentAgility + "  STR=" + entity.Stats.PermanentStrength +
-                    "  END=" + entity.Stats.PermanentEndurance + "  PER=" + entity.Stats.PermanentPersonality + "  RESISTANCES. Fire=" + entity.Resistances.PermanentFire +
-                    " Frost=" + entity.Resistances.PermanentFrost + " DiseaseOrPoison=" + entity.Resistances.PermanentDiseaseOrPoison + " Shock=" + entity.Resistances.PermanentShock +
-                    " Magic =" + entity.Resistances.PermanentMagic + "   "+armorstring);
+            entity.MaxHealth += 1;        // increasing MaxHealth in order to signal that this enemy's items have already been processed (fail the entity.CurrentHealth<entity.MaxHealth check next time)
+                                          // nearly every particular of enemies seems to be thrown away during save/load - MaxHealth and CurrentHealth seem to be exceptions, these are loaded back unchanged
+                                          // so these CAN be used to signal that we have processed the given entity 
+
+            EntityCharacteristicsToLog("Class Enemy characteristics AFTER changes made. ");
+
         }        
     }
 }
