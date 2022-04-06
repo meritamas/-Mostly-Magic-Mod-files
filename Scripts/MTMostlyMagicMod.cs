@@ -126,7 +126,7 @@ namespace MTMMM
 
         public void Awake()
         {
-            if (ourModSettings.GetValue<bool>("Magic-relatedRuleChanges", "IntelligenceRequirementForPurchasingSpells"))
+            if (ourModSettings.GetValue<bool>("Magic-relatedRuleChanges", "SpellLearning"))
                 RegisterMTSpellBookWindow();            // eventually will need restructuring: other preconditions could prompt the necessity of registering our SpellBookWindow 
 
             if (ourModSettings.GetValue<bool>("NonMagicRuleChanges", "Earth-LikeSunLightDirections"))
@@ -512,7 +512,8 @@ namespace MTMMM
         void InitUnleveledEnemiesOnAwake()
         {
             PlayerEnterExit.OnPreTransition += SetDungeon_OnPreTransition;
-            PlayerEnterExit.OnTransitionExterior += ClearData_OnTransitionExterior;            
+            PlayerEnterExit.OnTransitionExterior += ClearData_OnTransitionExterior;
+            EnemyDeath.OnEnemyDeath += RemoveMMMObjects_OnEnemyDeath;
         }
 
         private static void SetDungeon_OnPreTransition(PlayerEnterExit.TransitionEventArgs args)
@@ -590,13 +591,59 @@ namespace MTMMM
             return savedDQL;
         }
 
+        public static int RemoveMMMObjectContained (ItemCollection itemCollection)
+        {            
+            List<DaggerfallUnityItem> itemsToRemove = new List<DaggerfallUnityItem>();
+
+            if (itemCollection != null)
+            {                
+                int numberOfItems = itemCollection.Count;
+                if (numberOfItems > 0)
+                {
+                    for (int i = 0; i < numberOfItems; i++)
+                    {
+                        DaggerfallUnityItem item = itemCollection.GetItem(i);
+                        if (item.shortName.Substring(0, 3) == "MMM")                        
+                            itemsToRemove.Add(item);                        
+                    }
+                }
+            }
+
+            foreach (DaggerfallUnityItem item in itemsToRemove)
+            {
+                itemCollection.RemoveItem(item);
+            }
+
+            SilentMessage("RemoveMMMObjectContained: removed "+ itemsToRemove.Count+" MMM items from passed ItemCollection");
+
+            return itemsToRemove.Count;
+        }
+
+        public static void RemoveMMMObjects_OnEnemyDeath (object sender, EventArgs e)
+        {
+            SilentMessage("RemoveMMMObjects_OnEnemyDeath has been called.");
+            EnemyDeath enemyDeath = sender as EnemyDeath;
+            if (enemyDeath != null)
+            {
+                DaggerfallEntityBehaviour entityBehaviour = enemyDeath.GetComponent<DaggerfallEntityBehaviour>();
+                if (entityBehaviour != null)
+                {
+                    EnemyEntity enemyEntity = entityBehaviour.Entity as EnemyEntity;
+                    if (enemyEntity != null)
+                    {
+                        RemoveMMMObjectContained(entityBehaviour.CorpseLootContainer.Items);
+                    }
+                }
+            }
+        }
+
         /// <summary>
         /// Gives the player info on whether init was successful.
         /// </summary>
         [Invoke(StateManager.StateTypes.Game, 0)]
         public static void ReportToUser(InitParams initParams)                      // TODO: THINK OVER IF THIS IS NEEDED AND IN WHAT FORM AND WHAT NAMES
         {
-            Message(greetingMessageToPlayerUnleveledEnemies);                    // display greeting message to player            
+            SilentMessage(greetingMessageToPlayerUnleveledEnemies);                    // display greeting message to player            
         }
         #endregion
 
@@ -623,15 +670,15 @@ namespace MTMMM
                 FormulaHelper.RegisterOverride(modInstance, "CalculateCasterLevel", (Func<DaggerfallEntity, IEntityEffect, int>)MMMFormulaHelper.GetSpellLevelForGame);
             }
 
-            if (ourModSettings.GetValue<bool>("Magic-relatedRuleChanges", "MinimumMagickaCostOn"))
-            {
-                MMMFormulaHelper.castCostFloor = ourModSettings.GetValue<int>("Magic-relatedRuleChanges", "MinimumMagickaCost");
+            MMMFormulaHelper.castCostFloor = ourModSettings.GetValue<int>("Magic-relatedRuleChanges", "MinimumSpellPointCost");
+            if (MMMFormulaHelper.castCostFloor != 5)
+            {                
                 FormulaHelper.RegisterOverride(modInstance, "CalculateTotalEffectCosts", (Func<EffectEntry[], TargetTypes, DaggerfallEntity, bool, FormulaHelper.SpellCost>)MMMFormulaHelper.CalculateTotalEffectCosts);
                 Message("Minimum spell cost set to: "+ MMMFormulaHelper.castCostFloor);
                     // consider registering the replacement for CalculateEffectCosts here
             }
 
-            if (true)           // TODO: a condition that would be true if the base game has been edited to use my skill&attribute system
+            if (true)           // TODO but can wait : a condition that would be true if the base game has been edited to use my skill&attribute system
             {
                 FormulaHelper.RegisterOverride(modInstance, "CalculateEffectCosts", (Func<IEntityEffect, EffectSettings, DaggerfallEntity, FormulaHelper.SpellCost>)MMMFormulaHelper.CalculateEffectCosts);
                 Message("Minimum effect cost override routine registered - effect cost decrease for magic skill levels above 95 will now be slower.");
@@ -641,7 +688,7 @@ namespace MTMMM
         public static void RegisterMTSpellBookWindow()
         {
             UIWindowFactory.RegisterCustomUIWindow(UIWindowType.SpellBook, typeof(MTSpellBookWindow));
-            MTSpellBookWindow.intelligenceRequirementForPurchasingSpells = ourModSettings.GetValue<bool>("Magic-relatedRuleChanges", "IntelligenceRequirementForPurchasingSpells");
+            MTSpellBookWindow.spellLearning = ourModSettings.GetValue<bool>("Magic-relatedRuleChanges", "SpellLearning");
             SilentMessage("registered windows");    // TODO TODO
         }
         #endregion

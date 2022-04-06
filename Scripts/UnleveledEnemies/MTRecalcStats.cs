@@ -12,6 +12,7 @@
  * For now, it seems to work as intended.
 */
 
+using System;
 using System.Collections.Generic;
 using DaggerfallConnect.Arena2;
 using UnityEngine;
@@ -52,6 +53,7 @@ namespace MTMMM
         DaggerfallEntityBehaviour entityBehaviour;
         EnemyEntity entity;
         PlayerEntity playerEntity;
+        static System.Random globalNumberGenerator = new System.Random(System.DateTime.Now.Millisecond);
         System.Random ourNumberGenerator;
 
         int getItemMaterialRandomDeviation()
@@ -273,6 +275,34 @@ namespace MTMMM
                 itemString + System.Environment.NewLine + 
                 armorString ); 
         }        
+        /*  The random seed is saved/loaded via a Parchment object that has its name edited to 'MMM????' with ???? being the random seed.        */
+        int GetEntityRandomSeed()
+        {
+            if (entity.Items != null)
+            {
+                int numberOfItems = entity.Items.Count;
+                if (numberOfItems > 0)
+                {
+                    for (int i = 0; i < numberOfItems; i++)
+                    {
+                        DaggerfallUnityItem item = entity.Items.GetItem(i);
+                        if (item.shortName.Substring(0, 3) == "MMM")
+                            return Int32.Parse(item.shortName.Substring(3));
+                    }
+                }
+            }
+            return -1;
+        }
+
+        void SetEntityRandomSeed(int ourSeed)
+        {
+            if (entity.Items != null)
+            {
+                DaggerfallUnityItem newItem = ItemBuilder.CreateItem(ItemGroups.UselessItems2, (int)UselessItems2.Parchment);
+                newItem.shortName = "MMM" + ourSeed;
+                entity.Items.AddItem(newItem);
+            }
+        }
 
         void Start()
         {
@@ -306,29 +336,21 @@ namespace MTMMM
             MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("==========================================================================================" + System.Environment.NewLine +
                 "RecalcStats.Start() has been called. MobileEnemy ID: " + mobileEnemy.ID + ", entityType: " + entityType + ", career name: " + entity.Career.Name);
             
-            EntityCharacteristicsToLog("Enemy characteristics BEFORE any changes made. "); 
+            EntityCharacteristicsToLog("Enemy characteristics BEFORE any changes made. ");
 
-            bool isThisANewEnemy = true;            // will be able to judge only after setting MaximumHealth - then, if CurrentHealth is lower, then it is not a new enemy             
-            int randomSeed = 0;
-
-            if (entity.Items != null)
+            bool isThisANewEnemy = false;
+            int ourSeed = GetEntityRandomSeed();
+            if (ourSeed == -1)
             {
-                int numberOfItems = entity.Items.Count;
-                if (numberOfItems > 0)
-                {
-                    for (int i = 0; i < numberOfItems; i++)
-                    {
-                        DaggerfallUnityItem item = entity.Items.GetItem(i);
-                        if (item != null)
-                            randomSeed += item.TemplateIndex;
-                    }
-                }
-            }                       
+                isThisANewEnemy = true;
+                ourSeed = globalNumberGenerator.Next(0, 10000);
+                SetEntityRandomSeed(ourSeed);
+                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("No MMM signal artifact found on entity. Generated and set a random seed of " + ourSeed);
+            }
+            else
+                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Found an MMM signal artifact on entity, random seed: " + ourSeed);
 
-            randomSeed += mobileEnemy.ID + X * Y;                   // for now,  mobileEnemy.ID + map pixel coordinates + item templateindexes should do the job                        
-            ourNumberGenerator = new System.Random(randomSeed);     // eventually planning a more versatile way of doing things - currently each monster in the same map pixel of the same kind will have the exact same stats
-
-            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("X="+X+", Y="+Y+ ", random seed="+randomSeed);            
+            ourNumberGenerator = new System.Random(ourSeed);      
 
             /* here comes the code that does the work - but first, an insight into what we are up to
              *
@@ -389,11 +411,8 @@ namespace MTMMM
                 }
                 else
                     MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("   Not a class enemy. Leaving it alone.");
-                            // if it is a monster, we either set it to be an extra strong one or we leave it alone                      
-
-                if (entity.CurrentHealth == entity.MaxHealth)
-                    entity.MaxHealth += 1;        // increasing MaxHealth in order to signal that this enemy's items have already been processed (entity.CurrentHealth<entity.MaxHealth check)
-                                              // nearly every particular of enemies seems to be thrown away during save/load - MaxHealth and CurrentHealth seem to be exceptions, these are loaded back unchanged                      
+                            // if it is a monster, we either set it to be an extra strong one or we leave it alone
+                            
                 EntityCharacteristicsToLog("Enemy monster characteristics AFTER changes made. ");
 
                 return; 
@@ -415,13 +434,16 @@ namespace MTMMM
                 {
                     MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Player is not inside a dungeon and the entity is NOT a townguard: level-setting by random encounters method.");
                     int effectivePlayerLevel = playerLevel;
-                    if (effectivePlayerLevel > 23) effectivePlayerLevel = 23; // cap
+                    if (effectivePlayerLevel > 23) effectivePlayerLevel = 23; // cap                    
                     tempRandomVar = ourNumberGenerator.Next(0, 10);
+                    int tempRandomVar2 = ourNumberGenerator.Next(0, 6);
+
                     if (tempRandomVar == 0)
-                        entity.Level = playerLevel - 10 + ourNumberGenerator.Next(0, 6);
+                        entity.Level = playerLevel - 10 + tempRandomVar2;
                     else if (tempRandomVar == 9)
-                        entity.Level = playerLevel + 4 + ourNumberGenerator.Next(0, 6);
+                        entity.Level = playerLevel + 4 + tempRandomVar2;
                     else entity.Level = playerLevel - 4 + tempRandomVar - 1;
+                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("RND1 = "+ tempRandomVar + ", RND2=" + tempRandomVar2 + ":: Level set to " + entity.Level);
                 }
                 else  // for townguards
                 {
@@ -486,7 +508,7 @@ namespace MTMMM
                 /* If we are inside a dungeon, then the enemy level should depend on dungeon quality level.
                  * 10% DQL-2, 20% DQL-1, 40% DQL, 20% DQL+1, 10% DQL+2                 */   
             {
-                tempRandomVar = ourNumberGenerator.Next(0, 10);                                        // TODO: revise code like above                
+                tempRandomVar = ourNumberGenerator.Next(0, 10);                                                     
 
                 int dungeonQualityLevel = MTMostlyMagicMod.dungeonQuality();
                 MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Player is inside a dungeon type "+ MTMostlyMagicMod.dungeon+" of QL: "+ dungeonQualityLevel + " random number picked is "+ tempRandomVar);
@@ -541,14 +563,12 @@ namespace MTMMM
                 */
 
             // II. re-setting max health now
-
-            isThisANewEnemy = (entity.CurrentHealth == entity.MaxHealth);       // setting a flag so we know later that we are running for the first time on the given enemy
-            
+                       
             entity.MaxHealth = MMMFormulaHelper.RollEnemyClassMaxHealth(entity.Level, entity.Career.HitPointsPerLevel, ourNumberGenerator);                              
 
             if (isThisANewEnemy)
             {
-                entity.CurrentHealth = entity.MaxHealth;    // TODO: only do this if running for the first time
+                entity.CurrentHealth = entity.MaxHealth;    
                 MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("\tEntity level +" + entity.Level + ", Max Health set to " + entity.MaxHealth + ", since running for the first time, also set Current Health to " + entity.CurrentHealth);
             }
             else
@@ -685,11 +705,7 @@ namespace MTMMM
                     if (entity.ArmorValues[i] > 60)
                         entity.ArmorValues[i] = 60;
                 }                
-            }
-
-            entity.MaxHealth += 1;        // increasing MaxHealth in order to signal that this enemy's items have already been processed (fail the entity.CurrentHealth<entity.MaxHealth check next time)
-                                          // nearly every particular of enemies seems to be thrown away during save/load - MaxHealth and CurrentHealth seem to be exceptions, these are loaded back unchanged
-                                          // so these CAN be used to signal that we have processed the given entity 
+            }            
 
             EntityCharacteristicsToLog("Class Enemy characteristics AFTER changes made. ");
 

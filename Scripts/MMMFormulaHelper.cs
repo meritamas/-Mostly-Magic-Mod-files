@@ -399,7 +399,9 @@ namespace MTMMM
             return effectCost;
         }
 
-        // Generates health for enemy classes based on level and class
+        /// <summary>
+        /// Generates health for enemy classes based on level and class, using a given random number generator
+        /// </summary>
         public static int RollEnemyClassMaxHealth(int level, int hitPointsPerLevel, System.Random ourNumberGenerator)
         { 
             const int baseHealth = 10;
@@ -410,6 +412,23 @@ namespace MTMMM
                 maxHealth += ourNumberGenerator.Next(1, hitPointsPerLevel + 1);
             }
             return maxHealth;
+        }
+
+        /// <summary>
+        /// Calculates the time it takes for PC to learn a spell with the given magicka cost, in minutes
+        /// </summary>
+        public static int CalculateSpellLearningTimeCost(double magickaCost)
+        {
+            // Theoretical maximum for learning a spell is SpellPointCost <= Intelligence
+            // If SpellpointCost == Intelligence, the returned time period should be 10 hours = 600 minutes (5)   f(1)   = 600
+            // If SpellpointCost < INT / 5, the returned time period should be 24 minutes                   (1)   f(1/5) = 24
+            // the transition should not be linear, rather parabolic or hyperbolic                              f(x) = 600 * x^2
+            int ourLiveIntelligence = GameManager.Instance.PlayerEntity.Stats.LiveIntelligence;
+            double intelligenceRatio = magickaCost / (double)ourLiveIntelligence;
+            int spellLearningTimeCost = Math.Max(trunc(600 * intelligenceRatio * intelligenceRatio), 24);        // establish a minimum of 24 minutes
+            MMMFormulaHelperSilentInfoMessage("CalculateSpellLearningTimeCost: LiveINT=" + ourLiveIntelligence+", magickaCost="+magickaCost+
+                ", IntelligenceRatio="+intelligenceRatio+", TimeCost="+spellLearningTimeCost);
+            return spellLearningTimeCost;
         }
     }
 }
