@@ -30,6 +30,7 @@ namespace MTMMM
     public class MTSummonSimpleItem : BaseEntityEffect
     {
         public static readonly string EffectKey = "CreateItem";
+        static string messagePrefix = "MTSummonSimpleItem: ";
 
         DaggerfallListPickerWindow itemPicker;
         static int lastSelectedIndex = 0;
@@ -67,6 +68,22 @@ namespace MTMMM
             Robes,
         }
 
+        static void Message(string message)
+        {
+            MTMostlyMagicMod.Message(messagePrefix + message);
+        }
+
+        static void SilentMessage(string message)
+        {
+            MTMostlyMagicMod.SilentMessage(messagePrefix + message);
+        }
+
+        static void HUDMessage(string message)
+        {
+            MTMostlyMagicMod.Message(message, true, true, true, false, false);
+        }
+
+
         public MTSummonSimpleItem()
         {
             // Setup item picker for effect selection
@@ -81,6 +98,7 @@ namespace MTMMM
             itemPicker.ListBox.SelectIndex(lastSelectedIndex);
             itemPicker.ListBox.ScrollToSelected();
         }
+
 
         public override void SetProperties()
         {
@@ -127,7 +145,7 @@ namespace MTMMM
             if (item != null)
                 GameManager.Instance.PlayerEntity.Items.AddItem(item);
             else
-                MMMFormulaHelper.MMMFormulaHelperInfoMessage("Conjuration spell effect failed.");
+                HUDMessage("Conjuration spell effect failed.");
 
             // Close picker and unsubscribe event
             UserInterfaceManager uiManager = DaggerfallUI.Instance.UserInterfaceManager;
@@ -160,7 +178,7 @@ namespace MTMMM
                     locationCoefficient = 2;
                     break;
             }
-            MMMFormulaHelper.MMMFormulaHelperInfoMessage("MTSummonSimpleItem : locationCoefficient generated = "+ locationCoefficient+", base chance of success is "+ baseChanceOfSuccess);
+            Message("MTSummonSimpleItem : locationCoefficient generated = "+ locationCoefficient+", base chance of success is "+ baseChanceOfSuccess);
             
             if (randomNumber >= baseChanceOfSuccess * locationCoefficient)
                 return item;

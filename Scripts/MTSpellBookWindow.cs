@@ -11,51 +11,72 @@
 // Original Author: Lypyl (lypyldf@gmail.com), Gavin Clayton (interkarma@dfworkshop.net)
 // Contributors:    Allofich, Hazelnut
 
-
-using UnityEngine;
-using DaggerfallWorkshop;
-using DaggerfallWorkshop.Game.UserInterface;
-using DaggerfallWorkshop.Game.MagicAndEffects;
-using DaggerfallWorkshop.Game.Formulas;
-using DaggerfallWorkshop.Game.Entity;
-using DaggerfallWorkshop.Game.Items;
 using DaggerfallConnect;
 using DaggerfallConnect.Arena2;
+using DaggerfallConnect.Save;
+
+using DaggerfallWorkshop;
+using DaggerfallWorkshop.Game;
+using DaggerfallWorkshop.Game.Entity;
+using DaggerfallWorkshop.Game.Formulas;
+using DaggerfallWorkshop.Game.Guilds;
+using DaggerfallWorkshop.Game.Items;
+using DaggerfallWorkshop.Game.MagicAndEffects;
+using DaggerfallWorkshop.Game.UserInterface;
+using DaggerfallWorkshop.Game.UserInterfaceWindows;
+using DaggerfallWorkshop.Game.Utility.ModSupport;   //required for modding features
+using DaggerfallWorkshop.Game.Utility.ModSupport.ModSettings;
 using DaggerfallWorkshop.Utility;
 using DaggerfallWorkshop.Utility.AssetInjection;
+
+using UnityEngine;
+
 using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
-using DaggerfallConnect.Save;
-using DaggerfallWorkshop.Game;
-using DaggerfallWorkshop.Game.UserInterfaceWindows;
-using DaggerfallWorkshop.Game.Utility.ModSupport;   //required for modding features
-using DaggerfallWorkshop.Game.Utility.ModSupport.ModSettings;
-using DaggerfallWorkshop.Game.Guilds;
 
 namespace MTMMM
 {
     public class MTSpellBookWindow : DaggerfallSpellBookWindow
     {
+        static string messagePrefix = "MTSpellBookWindow: ";
         public static bool spellLearning;
-        public string[] onSpellSale1 = { "I understand. You must know and also understand that I cannot", "offer to teach you this spell for free.", "The guild fee needs to be covered, among other things.",
-            "In addition, it will take some time and you will need to", "expend some spell points practicing the spell.", "goldcost={0}, timecost={1}, magickacost={2}, fatiguecost={3}",
-            "Shall I teach you the spell now?"};        
+        public string[] onSpellSale1 = { "An interesting choice. Of course, there will be some costs involved.",
+            "",
+            "First, the guild fee will be {0} gold pieces.",    // index=2
+            "It will also take {0} minutes and {1} of your spell points for me to teach you the new spell.",    // index=3
+            "If we are finished withing an hour, I can do this as a favor to you, but otherwise this fee needs to be payed as well...",
+            "... that will be {0} gold pieces.", // index=5            
+            " ",
+            "To sum it up, the new spell will cost you {0} gold pieces, {1} minutes, {2} spell points and {3} fatigue points.", // index=7
+            " ",
+            "Shall we begin now?"};
         int actualSpellPointCost;
         int actualSpellLearningTimeCost;
         int actualSpellPointCostOfLearning;
 
         public MTSpellBookWindow(IUserInterfaceManager uiManager, DaggerfallBaseWindow previous = null, bool buyMode = false) : base(uiManager, previous, buyMode)
-        {  
+        {
+            MMMFormulaHelper.ReturnSpellAttributeIncidencesString();
             if (buyMode)
             {
                 uint factionID = GameManager.Instance.PlayerEnterExit.FactionID;
-                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("MTSpellBookWindow being created in buy mode, in object with a factionID of "+ factionID);
+                SilentMessage("MTSpellBookWindow being created in buy mode, in object with a factionID of "+ factionID);
                 IGuild ownerGuild = GameManager.Instance.GuildManager.GetGuild((int)factionID);
                 int playerRankInGuild = ownerGuild.Rank;
-                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Guild object successfully obtained for " + factionID+", player rank in guild: "+playerRankInGuild);
+                SilentMessage("Guild object successfully obtained for " + factionID+", player rank in guild: "+playerRankInGuild);
             }
+        }
+
+        static void Message(string message)
+        {
+            MTMostlyMagicMod.Message(messagePrefix + message);
+        }
+
+        static void SilentMessage(string message)
+        {
+            MTMostlyMagicMod.SilentMessage(messagePrefix + message);
         }
 
         protected override void PopulateSpellsList(List<EffectBundleSettings> spells, int? availableSpellPoints = null)
@@ -102,7 +123,7 @@ namespace MTMMM
                 ListBox.ListItem listItem;
                 string spellListString = string.Format("{0}-{1}", tmpSpellCost.spellPointCost, spell.Name);
                 spellsListBox.AddItem(spellListString, out listItem);
-                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Populating SpellBox Spell List: spell '"+ spellListString+"' was found to have a confidentiality level of "+ spellConfidentialityLevel);
+                SilentMessage("Populating SpellBox Spell List: spell '"+ spellListString+"' was found to have a confidentiality level of "+ spellConfidentialityLevel);
                                 // for now, log confidentiality level to player.log
 
                 if (availableSpellPoints != null && availableSpellPoints < tmpSpellCost.spellPointCost)         // TODO: think of other aspects based on which some spells could be shown differently
@@ -160,7 +181,8 @@ namespace MTMMM
 
         protected override void UpdateSelection()
         {
-            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("MTSpellBookWindow.UpdateSelection called.");
+            //  MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("UpdateSelection called.");
+            SilentMessage(MMMFormulaHelper.ReturnSpellAttributeIncidencesString());
             if (spellLearning)
             {                
                 // Update spell list scroller
@@ -179,8 +201,8 @@ namespace MTMMM
                     (int _, int spellPointCost) = FormulaHelper.CalculateTotalEffectCosts(spellSettings.Effects, spellSettings.TargetType);
                     presentedCost = spellPointCost * 4;
                     actualSpellPointCost = spellPointCost;
-                    actualSpellPointCostOfLearning = actualSpellPointCost * 3;
-                    actualSpellLearningTimeCost = MMMFormulaHelper.CalculateSpellLearningTimeCost(actualSpellPointCost);
+                    actualSpellPointCostOfLearning = actualSpellPointCost * 3;      // TODO: consider moving this constant to mod options
+                    actualSpellLearningTimeCost = MMMFormulaHelper.CalculateSpellCreationTimeCost(spellSettings);
 
                     // Presented cost is halved on Witches Festival holiday
                     uint gameMinutes = DaggerfallUnity.Instance.WorldTime.DaggerfallDateTime.ToClassicDaggerfallTime();
@@ -248,51 +270,67 @@ namespace MTMMM
                 const int tradeMessageBaseId = 260;
                 const int notEnoughGoldId = 454;
                 int tradePrice = GetTradePrice();
+                int classicTradePrice = GetClassicFinalTradePrice();
                 int msgOffset = 0;
                 EffectBundleSettings spell = offeredSpells[spellsListBox.SelectedIndex];
                 FormulaHelper.SpellCost spellCost = FormulaHelper.CalculateTotalEffectCosts(spell.Effects, spell.TargetType, null, spell.MinimumCastingCost);
                 actualSpellPointCost = spellCost.spellPointCost;
-                actualSpellLearningTimeCost = MMMFormulaHelper.CalculateSpellLearningTimeCost(actualSpellPointCost);
+                actualSpellPointCostOfLearning = actualSpellPointCost * 3;
+                actualSpellLearningTimeCost = MMMFormulaHelper.CalculateSpellCreationTimeCost(spell);
                 
                 if (!GameManager.Instance.PlayerEntity.Items.Contains(ItemGroups.MiscItems, (int)MiscItems.Spellbook))
                 {
                     DaggerfallUI.MessageBox(noSpellBook);
+                    return;
                 }
-                else if (GameManager.Instance.PlayerEntity.GetGoldAmount() < tradePrice)
+
+                if (GameManager.Instance.PlayerEntity.GetGoldAmount() < tradePrice)
                 {
                     DaggerfallUI.MessageBox(notEnoughGoldId);
+                    return;
                 }
-                else if (GameManager.Instance.PlayerEntity.Stats.LiveIntelligence < actualSpellPointCost)
+
+                if (actualSpellLearningTimeCost>600)
                 {
-                    DaggerfallUI.MessageBox("At present, you seem unable to master this spell. Perhaps if you were more intelligent or had more experience in the relevant school of magic.");
+                    DaggerfallUI.MessageBox("You seem unable to master such a spell. (More intelligence, experience in the school or with similar spells could help.");
+                    return;
                 }
-                else
-                if ((GameManager.Instance.PlayerEntity.CurrentFatigue < PlayerEntity.DefaultFatigueLoss * (actualSpellLearningTimeCost / 60+1)) ||
+
+                if ((GameManager.Instance.PlayerEntity.CurrentFatigue < PlayerEntity.DefaultFatigueLoss * (actualSpellLearningTimeCost + 60)) || // should provide for fatigue to end training with 1 hours reserve left
                     (GameManager.Instance.PlayerEntity.CurrentMagicka < actualSpellPointCost))
                 {
-                    DaggerfallUI.MessageBox("You are too tired to learn this spell right now. Return when you are well rested.");
-                }
-                else
+                    DaggerfallUI.MessageBox("You seem too tired to learn this spell right now. Return when you are well rested.");
+                    return;
+                }                
+                
+                if (presentedCost >> 1 <= tradePrice)               // TODO: consider, this here is probably not needed
                 {
-                    if (presentedCost >> 1 <= tradePrice)
-                    {
-                        if (presentedCost - (presentedCost >> 2) <= tradePrice)
-                            msgOffset = 2;
-                        else
-                            msgOffset = 1;
-                    }                               
+                    if (presentedCost - (presentedCost >> 2) <= tradePrice)
+                        msgOffset = 2;
+                    else
+                        msgOffset = 1;
+                }                               
 
-                    DaggerfallMessageBox messageBox = new DaggerfallMessageBox(uiManager, this);
+                DaggerfallMessageBox messageBox = new DaggerfallMessageBox(uiManager, this);
 
-                    string[] acturalSpellTeachBoxText = { onSpellSale1[0], onSpellSale1[1], onSpellSale1[2], onSpellSale1[3], onSpellSale1[4],
-                    string.Format(onSpellSale1[5], tradePrice, actualSpellLearningTimeCost, actualSpellPointCostOfLearning, PlayerEntity.DefaultFatigueLoss * actualSpellLearningTimeCost / 60), onSpellSale1[6]};                    
+                string[] actualSpellTeachBoxText = { onSpellSale1[0],
+                    onSpellSale1[1],
+                string.Format(onSpellSale1[2], classicTradePrice),    // guild fee gold cost
+                string.Format(onSpellSale1[3], actualSpellLearningTimeCost, actualSpellPointCostOfLearning),    // time cost, spell point cost
+                onSpellSale1[4],
+                string.Format(onSpellSale1[5], tradePrice-classicTradePrice),      // training gold cost // TODO: consider moving 500 to mod options
+                onSpellSale1[6],
+                string.Format(onSpellSale1[7], tradePrice, actualSpellLearningTimeCost, actualSpellPointCostOfLearning, PlayerEntity.DefaultFatigueLoss * actualSpellLearningTimeCost / 60),
+                onSpellSale1[8],
+                onSpellSale1[9]
+                };
 
-                    messageBox.SetText(acturalSpellTeachBoxText, this);
-                    messageBox.AddButton(DaggerfallMessageBox.MessageBoxButtons.Yes);
-                    messageBox.AddButton(DaggerfallMessageBox.MessageBoxButtons.No);
-                    messageBox.OnButtonClick += ConfirmTrade_OnButtonClick;
-                    uiManager.PushWindow(messageBox);
-                }
+                messageBox.SetText(actualSpellTeachBoxText, this);
+                messageBox.AddButton(DaggerfallMessageBox.MessageBoxButtons.Yes);
+                messageBox.AddButton(DaggerfallMessageBox.MessageBoxButtons.No);
+                messageBox.OnButtonClick += ConfirmTrade_OnButtonClick;
+                uiManager.PushWindow(messageBox);
+                
             }
             else
             {
@@ -300,10 +338,20 @@ namespace MTMMM
             }
         }
 
+        protected virtual int GetClassicTradePrice()
+        {
+            return FormulaHelper.CalculateTradePrice(presentedCost, buildingDiscoveryData.quality, false);
+        }
+
+        protected virtual int GetClassicFinalTradePrice()
+        {
+            return FormulaHelper.CalculateTradePrice(GetClassicTradePrice(), buildingDiscoveryData.quality, false);
+        }
+
         protected override int GetTradePrice()          // TODO: can wait - add calculation for magicka/stamina/health potions sold
                                                         // TODO: can wait - add calculation for food provided if instruction takes longer than 4 hours - check how Ralzar's mod handles things                                                        
         {
-            int classicTradePrice = FormulaHelper.CalculateTradePrice(presentedCost, buildingDiscoveryData.quality, false);
+            int classicTradePrice = GetClassicTradePrice();
 
             if (!spellLearning)
                 return classicTradePrice;           // if the relevant mod preference is not ticked, return as classic would, else continue and calculate our own price
@@ -314,8 +362,7 @@ namespace MTMMM
                                                 // TODO: consider changing it so presented cost included the extra charges
 
             int tradePriceToReturn = FormulaHelper.CalculateTradePrice(ourPresentedCost, buildingDiscoveryData.quality, false);
-            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage(
-                string.Format("MTSpellBookWindow.GetTradePrice: Classic Trade Price={0}, Hours Of Instruction Completed={1}, Our Presented Cost={2}, Trade Price To Return={3}.",
+            SilentMessage(string.Format("GetTradePrice: Classic Trade Price={0}, Hours Of Instruction Completed={1}, Our Presented Cost={2}, Trade Price To Return={3}.",
                 classicTradePrice, hoursOfInstructionCompleted, ourPresentedCost, tradePriceToReturn));
 
             return tradePriceToReturn;
@@ -330,33 +377,48 @@ namespace MTMMM
                 if (messageBoxButton == DaggerfallMessageBox.MessageBoxButtons.Yes)
                 {
                     // Deduct gold - adding gold sound for additional feedback
-                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("MTSpellBookWindow.ConfirmTrade_OnButtonClickPlayer: player fatigue before change: "+ GameManager.Instance.PlayerEntity.CurrentFatigue);
+                    SilentMessage("ConfirmTrade_OnButtonClickPlayer: player fatigue before change: "+ GameManager.Instance.PlayerEntity.CurrentFatigue);
                     int goldCost = GetTradePrice();
                     GameManager.Instance.PlayerEntity.DeductGoldAmount(goldCost);
                     DaggerfallUI.Instance.PlayOneShot(SoundClips.GoldPieces);
 
-                    actualSpellPointCostOfLearning = actualSpellPointCost * 3;      // you need to be able to cast the spell 3 times in order to learn it
-                    int numberOfFatiguePointsToSubtract = PlayerEntity.DefaultFatigueLoss * actualSpellLearningTimeCost;    // '/60' divisor removed  
+                    actualSpellPointCostOfLearning = actualSpellPointCost * 3;      // learning a spell consumes the same amount of spell points as casting it 3 times
+                            // TODO: consider moving this multiplier 3 to settings
+                    int numberOfFatiguePointsToSubtract = PlayerEntity.DefaultFatigueLoss * actualSpellLearningTimeCost;
                     int numberOfSpellointsToSubtract = actualSpellPointCostOfLearning;
 
                     GameManager.Instance.PlayerEntity.DecreaseFatigue(numberOfFatiguePointsToSubtract);
                     GameManager.Instance.PlayerEntity.DecreaseMagicka(numberOfSpellointsToSubtract);
 
-                    DaggerfallDateTime now = DaggerfallUnity.Instance.WorldTime.Now;
-                    now.RaiseTime(DaggerfallDateTime.SecondsPerMinute * actualSpellLearningTimeCost); //  actualSpellLearningTimeCost is in minutes and you have to give the value here in seconds
+                    MTMostlyMagicMod.ElapseMinutes (actualSpellLearningTimeCost); 
 
-                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage(
-                    string.Format("MTSpellBookWindow.ConfirmTrade_OnButtonClick: Spell learning costs incurred. Gold={0}, SpellPoints={1}, FatiguePoints={2}, Time={3} minutes.",
+                    SilentMessage(string.Format("ConfirmTrade_OnButtonClick: Spell learning costs incurred. Gold={0}, SpellPoints={1}, FatiguePoints={2}, Time={3} minutes.",
                     goldCost, numberOfSpellointsToSubtract, numberOfFatiguePointsToSubtract, actualSpellLearningTimeCost));
-                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("MTSpellBookWindow.ConfirmTrade_OnButtonClickPlayer: player fatigue after change: " + GameManager.Instance.PlayerEntity.CurrentFatigue);
-
-                    /* TODO: consider to have spell learning train the relevant magic skill too
-                     * int skillAdvancementMultiplier = DaggerfallSkills.GetAdvancementMultiplier(skillToTrain);
-                     * short tallyAmount = (short)(UnityEngine.Random.Range(10, 20 + 1) * skillAdvancementMultiplier);
-                     * playerEntity.TallySkill(skillToTrain, tallyAmount);               */
+                    SilentMessage("ConfirmTrade_OnButtonClickPlayer: player fatigue after change: " + GameManager.Instance.PlayerEntity.CurrentFatigue);                  
 
                     // Add to player entity spellbook
                     GameManager.Instance.PlayerEntity.AddSpell(offeredSpells[spellsListBox.SelectedIndex]);
+
+                    /* have spell learning train the relevant magic skills too   */
+
+                    int hoursOfInstructionCompleted = (actualSpellLearningTimeCost / 60);
+                    int totalTrainingPoints = hoursOfInstructionCompleted * UnityEngine.Random.Range(10, 20 + 1) / 3 + 3;
+
+                    EffectBundleSettings spell = offeredSpells[spellsListBox.SelectedIndex];
+                    IEntityEffect effectTemplate;    
+
+                    for (int i = 0; i < spell.Effects.Length; i++)
+                    {
+                        effectTemplate = GameManager.Instance.EntityEffectBroker.GetEffectTemplate(spell.Effects[i].Key);
+                        DFCareer.Skills skillToTrain = (DFCareer.Skills)effectTemplate.Properties.MagicSkill;
+
+                        int skillAdvancementMultiplier = DaggerfallSkills.GetAdvancementMultiplier(skillToTrain);
+                        short tallyAmount = (short)((totalTrainingPoints / spell.Effects.Length) * skillAdvancementMultiplier);
+                        GameManager.Instance.PlayerEntity.TallySkill(skillToTrain, tallyAmount);
+                        SilentMessage(string.Format("ConfirmTrade_OnButtonClickPlayer. {0}/{1}: totalTrainingPoints={2}, key={3}, skillToTrain={4}, skillAdvancementMultiplier={5}, tallyAmount={6}",
+                            i, spell.Effects.Length, totalTrainingPoints, spell.Effects[i].Key, (int)skillToTrain, skillAdvancementMultiplier, tallyAmount));
+                    }
+                    
                     UpdateGold();
                 }
                 CloseWindow();

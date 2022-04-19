@@ -25,11 +25,22 @@ namespace MTMMM
     public class MTMultiplyProvisions : BaseEntityEffect
     {
         public static readonly string EffectKey = "MultiplyProvisions";
+        static string messagePrefix = "MTMultiplyProvisions: ";
         public static float minimumModifier = 0.75F;
         public static float maximumModifier = 1.33F;
 
         DaggerfallListPickerWindow itemPicker;
-        static List<DaggerfallUnityItem> validProvisionItems = new List<DaggerfallUnityItem>();        
+        static List<DaggerfallUnityItem> validProvisionItems = new List<DaggerfallUnityItem>();
+
+        static void Message(string message)
+        {
+            MTMostlyMagicMod.Message(messagePrefix + message);
+        }
+
+        static void SilentMessage(string message)
+        {
+            MTMostlyMagicMod.SilentMessage(messagePrefix + message);
+        }
 
         public override void SetProperties()
         {
@@ -133,7 +144,7 @@ namespace MTMMM
                 int maxResultingQuantityX10 = (int) Math.Truncate(provisionItem.weightInKg * 10 * ourMultiplyCoefficient * maximumModifier);
                 int resultingQuantityX10 = UnityEngine.Random.Range(minResultingQuantityX10, maxResultingQuantityX10);
                 provisionItem.weightInKg = Math.Min(((float)resultingQuantityX10) / 10, 2.0F);
-                MMMFormulaHelper.MMMFormulaHelperInfoMessage("MTMultiplyProvisions : WaterSkin, Magnitude = " + ourMagnitude+ " ourMultiplyCoefficient="+ ourMultiplyCoefficient+ " minResultingQuantityX10="+ minResultingQuantityX10+
+                SilentMessage("WaterSkin, Magnitude = " + ourMagnitude+ " ourMultiplyCoefficient="+ ourMultiplyCoefficient+ " minResultingQuantityX10="+ minResultingQuantityX10+
                     " maxResultingQuantityX10="+maxResultingQuantityX10+ " resultingQuantityX10="+ resultingQuantityX10+" newweight="+ provisionItem.weightInKg);                
             }
 
@@ -143,7 +154,7 @@ namespace MTMMM
                 int maxResultingQuantity = (int) Math.Truncate(provisionItem.weightInKg * ourMultiplyCoefficient * maximumModifier);
                 int resultingQuantity = UnityEngine.Random.Range(minResultingQuantity, maxResultingQuantity);
                 provisionItem.weightInKg = Math.Min((float)resultingQuantity, 4.0F);
-                MMMFormulaHelper.MMMFormulaHelperInfoMessage("MTMultiplyProvisions : Rations, Magnitude = " + ourMagnitude + " ourMultiplyCoefficient=" + ourMultiplyCoefficient + " minResultingQuantity=" + minResultingQuantity +
+                SilentMessage("MTMultiplyProvisions : Rations, Magnitude = " + ourMagnitude + " ourMultiplyCoefficient=" + ourMultiplyCoefficient + " minResultingQuantity=" + minResultingQuantity +
                     " maxResultingQuantity=" + maxResultingQuantity + " resultingQuantity=" + resultingQuantity + " newweight=" + provisionItem.weightInKg);
             }
 
@@ -153,7 +164,7 @@ namespace MTMMM
                 int maxResultingQuantity = (int)Math.Truncate(provisionItem.stackCount * ourMultiplyCoefficient * maximumModifier);
                 int resultingQuantity = UnityEngine.Random.Range(minResultingQuantity, maxResultingQuantity);
                 provisionItem.stackCount = Math.Max(resultingQuantity, 4);
-                MMMFormulaHelper.MMMFormulaHelperInfoMessage("MTMultiplyProvisions : Arrows, Magnitude = " + ourMagnitude + " ourMultiplyCoefficient=" + ourMultiplyCoefficient + " minResultingQuantity=" + minResultingQuantity +
+                SilentMessage("MTMultiplyProvisions : Arrows, Magnitude = " + ourMagnitude + " ourMultiplyCoefficient=" + ourMultiplyCoefficient + " minResultingQuantity=" + minResultingQuantity +
                     " maxResultingQuantity=" + maxResultingQuantity + " resultingQuantity=" + resultingQuantity + " newstackCount=" + provisionItem.stackCount);
             }                      
         }

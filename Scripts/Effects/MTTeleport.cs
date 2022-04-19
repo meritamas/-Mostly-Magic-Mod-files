@@ -38,6 +38,7 @@ namespace MTMMM
     /// </summary>
     public class MTTeleport : IncumbentEffect
     {
+        static string messagePrefix = "MTTeleport: ";
         public static readonly string EffectKey = "Teleport-Effect";
         public static readonly string WhatToDoMessageText = "As you feel magic powers flow through your body, you direct them to...";
         public static readonly string AnchorCreationFailedText = "Despite your best efforts, the mystical connection between you and this place does not feel stable and strong enough.";
@@ -144,6 +145,18 @@ namespace MTMMM
             ResignAsIncumbent();
         }
 
+        #endregion
+
+        #region Debug Methods
+        static void Message(string message)
+        {
+            MTMostlyMagicMod.Message(messagePrefix + message);
+        }
+
+        static void SilentMessage(string message)
+        {
+            MTMostlyMagicMod.SilentMessage(messagePrefix + message);
+        }
         #endregion
 
         #region Private Methods

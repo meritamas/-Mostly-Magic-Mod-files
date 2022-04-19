@@ -21,10 +21,11 @@ using DaggerfallWorkshop.Game.Entity;
 using DaggerfallWorkshop.Game.Items;
 using DaggerfallWorkshop.Game.Formulas;
 using DaggerfallWorkshop.Game.Utility;
-using DaggerfallWorkshop.Game.Utility.ModSupport;   //required for modding features
+using DaggerfallWorkshop.Game.Utility.ModSupport;   // required for modding features
 using DaggerfallWorkshop.Game.Utility.ModSupport.ModSettings;
 using DaggerfallWorkshop.Game.UserInterfaceWindows;
 using DaggerfallWorkshop.Game.MagicAndEffects;
+using DaggerfallWorkshop.Utility;
 using DaggerfallConnect;
 
 /*  The modules:
@@ -57,9 +58,7 @@ namespace MTMMM
         static public int matRoll;
         static public int region = 0;
         static public int dungeon = 0;
-        static public int savedDQL = -1;
-
-        public static string greetingMessageToPlayerUnleveledEnemies = "Enemy prefab changed? Init hung...";   // this is used to communicate to the appropriate method the string message that needs to be conveyed
+        static public int savedDQL = -1;        
 
             // these fields are for UnleveledSpells        
         public static string BasicGreetingsMessage = "Spell effects unleveled:";
@@ -108,14 +107,16 @@ namespace MTMMM
         public static void SilentMessage (string message)
         {
             Message(message, false);
-        }
+        }        
 
         /// <summary>
         /// Method to send messages, depending on settings either to HUD or the Player, or both or neither
         /// </summary>
-        public static void Message(string message, bool toHud=true, bool toPlayer=true, bool forceToHUD=false, bool forceToPlayer=false)
+        public static void Message(string message, bool toHud=true, bool toPlayer=true, bool forceToHUD=false, bool forceToPlayer=false, bool prefixMessage=true)
         {
-            string msg = "MT MMM: " + message;
+            string msg = message;
+            if (prefixMessage)
+                 msg= "MT MMM: " + msg;
 
             if (forceToHUD || (toHud && ourModSettings.GetValue<bool>("Debug", "DebugToHUD")))
                 DisplayMessageOnScreen(message);
@@ -127,7 +128,7 @@ namespace MTMMM
         public void Awake()
         {
             if (ourModSettings.GetValue<bool>("Magic-relatedRuleChanges", "SpellLearning"))
-                RegisterMTSpellBookWindow();            // eventually will need restructuring: other preconditions could prompt the necessity of registering our SpellBookWindow 
+                RegisterOurWindows();            // eventually will need restructuring: other preconditions could prompt the necessity of registering our SpellBookWindow 
 
             if (ourModSettings.GetValue<bool>("NonMagicRuleChanges", "Earth-LikeSunLightDirections"))
             {
@@ -141,10 +142,29 @@ namespace MTMMM
                 InitUnleveledEnemiesOnAwake();
         }
 
+                // These are the things the mod should do after each 'update' (I think every ??? seconds or so)
         void Update()
         {
             if (ourModSettings.GetValue<bool>("QualityOfLife", "ExerciseFastTravel"))
                 TimeAcceleratorUpdate();
+        }
+
+        public static void ElapseSeconds(int numberOfSecondsToPass)
+        {
+            DaggerfallDateTime now = DaggerfallUnity.Instance.WorldTime.Now;
+            now.RaiseTime(numberOfSecondsToPass);
+        }
+
+        public static void ElapseMinutes(int numberOfMinutesToPass)
+        {
+            DaggerfallDateTime now = DaggerfallUnity.Instance.WorldTime.Now;
+            now.RaiseTime(DaggerfallDateTime.SecondsPerMinute * numberOfMinutesToPass);
+        }
+
+        public static void ElapseHours(int numberOfHoursToPass)
+        {
+            DaggerfallDateTime now = DaggerfallUnity.Instance.WorldTime.Now;
+            now.RaiseTime(DaggerfallDateTime.SecondsPerHour * numberOfHoursToPass);
         }
 
         #endregion
@@ -175,10 +195,7 @@ namespace MTMMM
         {
             Debug.Log("MT MMM: (Mostly) Magic Mod Init Started");
             modInstance = ModManager.Instance.GetMod(modTitle);
-            ourModSettings = modInstance.GetSettings();
-
-            MMMFormulaHelper.MMMFormulaHelperInfoMessage = Message;
-            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage = SilentMessage;
+            ourModSettings = modInstance.GetSettings();            
         }        
 
         /// <summary>
@@ -187,12 +204,12 @@ namespace MTMMM
         public static void InitUnleveledEnemiesOnStart()
         {
             GameObject go = DaggerfallUnity.Instance.Option_EnemyPrefab.transform.gameObject;
-            go.AddComponent<MTMMM.RecalcStats>();
+            go.AddComponent<MTMMM.MTRecalcStats>();
 
             GameObject go2 = new GameObject(modInstance.Title);
             go2.AddComponent<MTMostlyMagicMod>();   // initializing the Unleveled and Extra Strong enemies part
 
-            greetingMessageToPlayerUnleveledEnemies = "Unleveled + Extra Strong Enemies in a position to work (Enemy prefab changed successfully)";
+            SilentMessage("Enemy prefab changed successfully");
             SilentMessage("InitUnleveledEnemies module init method Finished");
         }        
 
@@ -220,8 +237,8 @@ namespace MTMMM
             if (ourModSettings.GetValue<bool>("UnleveledEnemies", "Main"))
                 InitUnleveledEnemiesOnStart();
 
-            RecalcStats.extraStrongMonsters = ourModSettings.GetValue<bool>("ExtraStrongMonsters", "Main");
-            SilentMessage("Extra Strong Monsters Enabled = " + RecalcStats.extraStrongMonsters);            
+            MTRecalcStats.extraStrongMonsters = ourModSettings.GetValue<bool>("ExtraStrongMonsters", "Main");
+            SilentMessage("Extra Strong Monsters Enabled = " + MTRecalcStats.extraStrongMonsters);            
 
             InitRuleChanges();
             
@@ -237,7 +254,7 @@ namespace MTMMM
         /// </summary>
         public static void InitNewSpellsAndEffects()
         {
-            if (ourModSettings.GetValue<bool>("HighMagic", "AdvancedTeleporation-MultipleAnchorsPossible"))
+            if (ourModSettings.GetValue<bool>("NewEffectsAndSpells", "MultipleAnchorsForRecall"))
             {
                 BaseEntityEffect ourTeleportEffect = new MTTeleport();
 
@@ -641,9 +658,9 @@ namespace MTMMM
         /// Gives the player info on whether init was successful.
         /// </summary>
         [Invoke(StateManager.StateTypes.Game, 0)]
-        public static void ReportToUser(InitParams initParams)                      // TODO: THINK OVER IF THIS IS NEEDED AND IN WHAT FORM AND WHAT NAMES
+        public static void ReportToUser(InitParams initParams)                     
         {
-            SilentMessage(greetingMessageToPlayerUnleveledEnemies);                    // display greeting message to player            
+                    // display greeting message to player, if any is needed   
         }
         #endregion
 
@@ -685,10 +702,11 @@ namespace MTMMM
             }
         }
 
-        public static void RegisterMTSpellBookWindow()
+        public static void RegisterOurWindows()
         {
             UIWindowFactory.RegisterCustomUIWindow(UIWindowType.SpellBook, typeof(MTSpellBookWindow));
             MTSpellBookWindow.spellLearning = ourModSettings.GetValue<bool>("Magic-relatedRuleChanges", "SpellLearning");
+            UIWindowFactory.RegisterCustomUIWindow(UIWindowType.SpellMaker, typeof(MTSpellMakerWindow));
             SilentMessage("registered windows");    // TODO TODO
         }
         #endregion

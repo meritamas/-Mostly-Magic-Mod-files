@@ -30,8 +30,9 @@ using DaggerfallConnect;
 
 namespace MTMMM
 {
-    public class RecalcStats : MonoBehaviour
+    public class MTRecalcStats : MonoBehaviour
     {
+        static string messagePrefix = "MTRecalcStats: ";
         static public bool extraStrongMonsters = false;
 
         // From EnemyEntity.cs -- originally from FALL.EXE offset 0x1C0F14
@@ -56,6 +57,17 @@ namespace MTMMM
         static System.Random globalNumberGenerator = new System.Random(System.DateTime.Now.Millisecond);
         System.Random ourNumberGenerator;
 
+        static void Message(string message)
+        {
+            MTMostlyMagicMod.Message(messagePrefix + message);
+        }
+
+        static void SilentMessage(string message)
+        {
+            MTMostlyMagicMod.SilentMessage(messagePrefix + message);
+        }
+
+
         int getItemMaterialRandomDeviation()
         {
             int randomNumber = ourNumberGenerator.Next(0, 1024);
@@ -76,7 +88,7 @@ namespace MTMMM
         static int clampItemCategory (int categoryNumber)
         {
             if (categoryNumber < 1) return 1;
-            if (categoryNumber > 13) return 13;
+            if (categoryNumber > 16) return 16;
             return categoryNumber;
         }
 
@@ -84,7 +96,7 @@ namespace MTMMM
         {/*
             What these things should mean.
             If there is no deviation from the central level, then the chances of getting [a lesser material, exactly that material, a higher material] should be [33, 34, 33]
-            If there is a -1 deviation form the cenral level, then these chances should be [47, 27, 26], with a +1 deviation: [26, 27, 47]
+            If there is a -1 deviation form the central level, then these chances should be [47, 27, 26], with a +1 deviation: [26, 27, 47]
             So, If say LVL11 means the dominant material should be steel, than
                     for a LVL10 opponent, you should get 47% chance to get a lesser material, 27% to get steel and 26% to get a higher material
                     for a LVL11 opponent, you should get 33% chance to get a lesser material, 34% to get steel and 33% to get a higher material
@@ -117,16 +129,19 @@ namespace MTMMM
                 case 1: return WeaponMaterialTypes.Iron;
                 case 2: 
                 case 3: return WeaponMaterialTypes.Steel;
-                case 4: return WeaponMaterialTypes.Silver;
-                case 5: return WeaponMaterialTypes.Elven;
-                case 6: return WeaponMaterialTypes.Dwarven;
-                case 7: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? WeaponMaterialTypes.Orcish : WeaponMaterialTypes.Mithril;
-                case 8: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? WeaponMaterialTypes.Mithril : WeaponMaterialTypes.Adamantium;
-                case 9: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? WeaponMaterialTypes.Adamantium : WeaponMaterialTypes.Ebony;
-                case 10:                
-                case 11: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? WeaponMaterialTypes.Ebony : WeaponMaterialTypes.Orcish;
-                case 12:
-                case 13: return WeaponMaterialTypes.Daedric;
+                case 4:
+                case 5: return WeaponMaterialTypes.Silver;
+                case 6: return WeaponMaterialTypes.Elven;
+                case 7: return WeaponMaterialTypes.Dwarven;
+                case 8:
+                case 9: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? WeaponMaterialTypes.Orcish : WeaponMaterialTypes.Mithril;
+                case 10: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? WeaponMaterialTypes.Mithril : WeaponMaterialTypes.Adamantium;
+                case 11: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? WeaponMaterialTypes.Adamantium : WeaponMaterialTypes.Ebony;
+                case 12:                
+                case 13: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? WeaponMaterialTypes.Ebony : WeaponMaterialTypes.Orcish;
+                case 14:
+                case 15:
+                case 16: return WeaponMaterialTypes.Daedric;
 
                 default: return WeaponMaterialTypes.Iron;   // possibly change in the future for debug purposes
             }
@@ -140,33 +155,36 @@ namespace MTMMM
                 case 2: return ArmorMaterialTypes.Chain;
                 case 3: return ArmorMaterialTypes.Iron;
                 case 4: return ArmorMaterialTypes.Steel;
-                case 5: return ArmorMaterialTypes.Silver;
-                case 6: return ArmorMaterialTypes.Elven;
-                case 7: return ArmorMaterialTypes.Dwarven;
-                case 8: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? ArmorMaterialTypes.Orcish : ArmorMaterialTypes.Mithril;
-                case 9: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? ArmorMaterialTypes.Mithril : ArmorMaterialTypes.Adamantium;
-                case 10: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? ArmorMaterialTypes.Adamantium : ArmorMaterialTypes.Ebony;
-                case 11:
-                case 12: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? ArmorMaterialTypes.Ebony : ArmorMaterialTypes.Orcish;                
-                case 13: return ArmorMaterialTypes.Daedric;
+                case 5:
+                case 6: return ArmorMaterialTypes.Silver;
+                case 7: return ArmorMaterialTypes.Elven;
+                case 8: return ArmorMaterialTypes.Dwarven;
+                case 9:
+                case 10: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? ArmorMaterialTypes.Orcish : ArmorMaterialTypes.Mithril;
+                case 11: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? ArmorMaterialTypes.Mithril : ArmorMaterialTypes.Adamantium;
+                case 12: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? ArmorMaterialTypes.Adamantium : ArmorMaterialTypes.Ebony;
+                case 13:
+                case 14: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? ArmorMaterialTypes.Ebony : ArmorMaterialTypes.Orcish;
+                case 15:
+                case 16: return ArmorMaterialTypes.Daedric;
 
                 default: return ArmorMaterialTypes.Leather;   // possibly change in the future for debug purposes
             }
         }   
         /*
-         *  Here comes the comment to how extra strong enemies are generated 
+         *  Here comes the comment to how extra strong monsters are generated 
              */
         void SetExtraStrongMonsterStats(bool isThisANewEnemy)
         {
             if (ourNumberGenerator.Next(0, 10) > 0)
             {
-                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("This is definitely not an extra strong " + entity.Career.Name + ".");
+                SilentMessage("This is definitely not an extra strong " + entity.Career.Name + ".");
                 return;
             }           // the code that follows set the distinc characteristics for extra strong monsters
 
             int careerIndex = entity.CareerIndex;
             int healthMultiplicator = ourNumberGenerator.Next(5, 11);      // should be halved (so, from 2.5x to 5.5x)       
-            int spellPointMultiplicator = ourNumberGenerator.Next(4, 8);   // should be halved (so, from 2x to 4x)            
+            int spellPointMultiplicator = ourNumberGenerator.Next(4, 8);   // should be halved (so, from 2x to 4x)
 
             switch (careerIndex)
             {
@@ -183,7 +201,8 @@ namespace MTMMM
                     goto case ((int)MonsterCareers.Werewolf);                
 
                 case ((int)MonsterCareers.Werewolf):
-                case ((int)MonsterCareers.OrcWarlord):                    
+                case ((int)MonsterCareers.OrcWarlord):
+                    entity.Level += healthMultiplicator + spellPointMultiplicator; // should be just right... increases the entity's level (important for equipment matrial setting) by a number between 9 and 17
                     entity.MaxHealth = (entity.MaxHealth*healthMultiplicator) / 2;
                     if (isThisANewEnemy)
                         entity.CurrentHealth = entity.MaxHealth;                // setting new increased health number - but only if we are running for the first time
@@ -196,10 +215,10 @@ namespace MTMMM
 
                     /* TODO: here comes the code to boost certain skills (melee skills) and possibly other characteristics for all extra strong monsters */
 
-                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("An extra strong "+ entity.Career.Name+".");
+                    SilentMessage("An extra strong "+ entity.Career.Name+".");
                     break;
                 default:
-                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Not an extra strong " + entity.Career.Name + ".");
+                    SilentMessage("Not an extra strong " + entity.Career.Name + ".");
                     break;
             }
         }
@@ -264,7 +283,7 @@ namespace MTMMM
                 }                    
             }
 
-            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage(title + " Career.Name: " + entity.Career.Name + System.Environment.NewLine +
+           SilentMessage(title + " Career.Name: " + entity.Career.Name + System.Environment.NewLine +
                 "\tLevel: " + entity.Level + "  Health: " + entity.CurrentHealth + "/" + entity.MaxHealth + "  SpellPoints: " + entity.CurrentMagicka + "/" + entity.MaxMagicka + System.Environment.NewLine +
                 "\tAttributes.  Willpower=" + entity.Stats.PermanentWillpower + "  Intelligence=" + entity.Stats.PermanentIntelligence + "  Speed=" + entity.Stats.PermanentSpeed +
                 "  Luck=" + entity.Stats.PermanentLuck + "  Agility=" + entity.Stats.PermanentAgility + "  Strength=" + entity.Stats.PermanentStrength +
@@ -304,6 +323,66 @@ namespace MTMMM
             }
         }
 
+        void SetEquipmentMaterials()
+        {
+            for (int i = (int)EquipSlots.Head; i <= (int)EquipSlots.Feet; i++)       // does it include boots? ::  added equal, should be correct now ::                   TODO: check if it is correct this way.
+            {
+                DaggerfallUnityItem item = entity.ItemEquipTable.GetItem((EquipSlots)i);
+                if (item != null && item.ItemGroup == ItemGroups.Armor)
+                {
+                    TextFile.Token[] tokens = ItemHelper.GetItemInfo(item, DaggerfallUnity.Instance.TextProvider);
+                    MacroHelper.ExpandMacros(ref tokens, item);
+                    string oldItemString = tokens[0].text + " (TI=" + item.TemplateIndex + ")";
+
+                    entity.ItemEquipTable.UnequipItem(item);
+
+                    int groupIndex = item.GroupIndex; // not sure this is necessary
+                    DaggerfallUnityItem item2 = ItemBuilder.CreateItem(ItemGroups.Armor, item.TemplateIndex);
+
+                    ItemBuilder.ApplyArmorSettings(item2, playerEntity.Gender, playerEntity.Race, getArmorMaterialFromNumber(getRandomItemMaterial(entity.Level)), item.CurrentVariant);
+                    // town guards can have better than steel        // TODO: re-evaluate if any penalty is appropriate for town guards;; probably so (classic has a cap: no better than steel)
+                    item2.currentCondition = item2.maxCondition * item.ConditionPercentage / 100;
+
+                    entity.Items.RemoveItem(item);
+                    entity.Items.AddItem(item2);
+                    entity.ItemEquipTable.EquipItem(item2, true, false);
+
+                    TextFile.Token[] tokens2 = ItemHelper.GetItemInfo(item2, DaggerfallUnity.Instance.TextProvider);
+                    MacroHelper.ExpandMacros(ref tokens2, item2);
+
+                    SilentMessage("Instead of " + oldItemString + " added and equipped " + tokens2[0].text + " (TI=" + item2.TemplateIndex + ")");
+
+                }
+
+                if (item != null && item.ItemGroup == ItemGroups.Weapons)
+                {
+                    TextFile.Token[] tokens = ItemHelper.GetItemInfo(item, DaggerfallUnity.Instance.TextProvider);
+                    MacroHelper.ExpandMacros(ref tokens, item);
+                    string oldItemString = tokens[0].text + " (TI=" + item.TemplateIndex + ")";
+
+                    entity.ItemEquipTable.UnequipItem(item);
+
+                    int groupIndex = item.GroupIndex;       // not sure this is necessary
+                    DaggerfallUnityItem item2 = ItemBuilder.CreateItem(ItemGroups.Weapons, item.TemplateIndex);
+
+                    ItemBuilder.ApplyWeaponMaterial(item2, getWeaponMaterialFromNumber(getRandomItemMaterial(entity.Level)));
+                    // town guards can have better than steel        // TODO: re-evaluate if any penalty is appropriate for town guards;; probably so (classic has a cap: no better than steel)
+                    item2.currentCondition = item2.maxCondition * item.ConditionPercentage / 100;
+
+                    item2.poisonType = item.poisonType;     // retain poison
+
+                    entity.Items.RemoveItem(item);
+                    entity.Items.AddItem(item2);
+                    entity.ItemEquipTable.EquipItem(item2, true, false);
+
+                    TextFile.Token[] tokens2 = ItemHelper.GetItemInfo(item2, DaggerfallUnity.Instance.TextProvider);
+                    MacroHelper.ExpandMacros(ref tokens2, item2);
+
+                    SilentMessage("Instead of " + oldItemString + " added and equipped " + tokens2[0].text + " (TI=" + item2.TemplateIndex + ") -- poisontype=" + item2.poisonType);
+                }
+            }
+        }
+
         void Start()
         {
             int X = GameManager.Instance.PlayerGPS.CurrentMapPixel.X;
@@ -318,14 +397,14 @@ namespace MTMMM
 
             if (entityBehaviour==null)
             {
-                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("RecalcStats.Start() has been called. Entitybehaviour is null. exiting");
+                SilentMessage("RecalcStats.Start() has been called. Entitybehaviour is null. exiting");
                 return;
             }
 
             entity = entityBehaviour.Entity as EnemyEntity; // what if it is not Enemy?? answer: we would not be here. We are only part of the enemy prefab.
             if (entity == null)
             {
-                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("RecalcStats.Start() has been called. Entity is null. exiting");
+                SilentMessage("RecalcStats.Start() has been called. Entity is null. exiting");
                 return;
             }            
 
@@ -333,7 +412,7 @@ namespace MTMMM
             EntityTypes entityType = entity.EntityType;
             int careerIndex = entity.CareerIndex;            
             
-            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("==========================================================================================" + System.Environment.NewLine +
+            SilentMessage("==========================================================================================" + System.Environment.NewLine +
                 "RecalcStats.Start() has been called. MobileEnemy ID: " + mobileEnemy.ID + ", entityType: " + entityType + ", career name: " + entity.Career.Name);
             
             EntityCharacteristicsToLog("Enemy characteristics BEFORE any changes made. ");
@@ -345,12 +424,12 @@ namespace MTMMM
                 isThisANewEnemy = true;
                 ourSeed = globalNumberGenerator.Next(0, 10000);
                 SetEntityRandomSeed(ourSeed);
-                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("No MMM signal artifact found on entity. Generated and set a random seed of " + ourSeed);
+                SilentMessage("No MMM signal artifact found on entity. Generated and set a random seed of " + ourSeed);
             }
             else
-                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Found an MMM signal artifact on entity, random seed: " + ourSeed);
+                SilentMessage("Found an MMM signal artifact on entity, random seed: " + ourSeed);
 
-            ourNumberGenerator = new System.Random(ourSeed);      
+            ourNumberGenerator = new System.Random(ourSeed);
 
             /* here comes the code that does the work - but first, an insight into what we are up to
              *
@@ -359,7 +438,8 @@ namespace MTMMM
              * 
              * what determines the stength of an enemy?
              * - its max health, fatigue, magicka (this mod IS concerned with max health and magicka - max fatigue seems not to level)
-             * - its stats (this mod IS NOT overly concerned with this - because stats are set in game from Career and do not level anyway;; will explore the possibility of increase stats for 'super strong enemies')
+             * - its stats (this mod was not overly concerned with this - because stats are set in game from Career and do not level, but we ARE changing this, making stats higher for higher-level enemies, not just skills
+             *                  will also explore the possibility of increase stats for 'super strong enemies')
              * - its skills (this mod IS concerned with this)
              * - its spells (this mod IS concerned with this -  for class enemies whose spells are contingent on level)
              * - its equipment (this mod IS concerned with this)
@@ -374,14 +454,8 @@ namespace MTMMM
              * To the unmodded game, the answer for the most part is: player level. Here, we try to develop a different idea.
              *
              * Let's separate the class enemies into two groups: (1) dungeon mobs, (2) random encounters (to distinguish is easy - like Ralzar did - just need to know if the player is in a dungeon)
-             *              perhaps we will separately consider Town Guards
-             * 
-             * (2) With random encounters, it is hard to leave player level out of the equation if we don't want complete randomness.
-             * This might not be a good idea - low-level characters might get crushed too often and high-level characters would get too many outclassed enemies.
-             * The best option seems to be a compromise:
-             * - most (like 80%) random encounters with a level close (but not necessarily equal) to player level
-             * - and a smaller number (like 10-10%) of enemies with a much lower and much higher level compared to the player
-             *             * 
+             *              we will consider Town Guards separately
+             *
              * (1) As for dungeon mobs, Ralzar's basic idea that he applied to loot is a good one: invent a 'Dungeon Quality Level' and make the opponents' level contingent on that.
              * Here I would add that some difference should be allowed (like from DQL-2 to DQL+2). Ralzar has already invented DQL in Unleveled Loot, we will go with his method for now, with some additions.
              * First, HumanStronghold, RuinedCastle, Prison should also have a DQL assigned. 
@@ -390,6 +464,11 @@ namespace MTMMM
              * These dungeon levels should not be random. They should be deterministic. Could be calculated from the dungeon class and a hash of the dungeon oordinates and the actual quarter.
              * This way any given dungeon can gain or loose some quality as time passes.
              * An example: any concrete VampireHaunt dungeon should have a level calculated as a base (15) + modifier (from -2 to 2 calculated based on hash)
+             * 
+             * (2) Aa for random encounters, let's invent a Local Difficulty Level (LDL) and use it like DQL.
+             *      For now, using a fixed figure of 10. LDL could in turn be contingent on
+             *      - proximity to roads, settlements, dungeons or other locations
+             *      - seasonal variance    
              *
              * So, now we go and set the enemy entity's:
              * - level
@@ -402,52 +481,61 @@ namespace MTMMM
 
             if (entityType != EntityTypes.EnemyClass)
             {
+
                 /* Printing important stats about the enemy for experimental and debug purposes*/                
 
                 if (extraStrongMonsters)
                 {
-                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("   Not a class enemy. Checking if it is an extra strong monster.");
+                    SilentMessage("   Not a class enemy. Checking if it is an extra strong monster, then setting equipment materials according to new potentially higher level.");
                     SetExtraStrongMonsterStats(isThisANewEnemy);                    
                 }
                 else
-                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("   Not a class enemy. Leaving it alone.");
-                            // if it is a monster, we either set it to be an extra strong one or we leave it alone
-                            
+                    SilentMessage("   Not a class enemy. Setting equipment materials according to its level.");
+                    // if it is a monster, we set it to be an extra strong one or not, and then process its items
+
+                SetEquipmentMaterials();
                 EntityCharacteristicsToLog("Enemy monster characteristics AFTER changes made. ");
 
                 return; 
-            }              
+            }
 
-            // careerindex and stats already set - they are okay that way for now
-                    // TODO: if super strong enemies will have increased stats, the code could come here
+            // careerindex and stats already set - they are okay that way for now - will be setting them based on level
+            // TODO: if super strong enemies will have increased stats, the code could come here
 
             // I. So now, setting the level.
 
             /* If random encounter, then
-             *  10%-10%-10% chance of enemy at playerlevel-4 .. .. playerlevel +3
-             *  10% chance of an enemy level lower than playerlevel-4 (down to playerlevel-10)
-             *  10% chance of an enemy level higher than playerlevel+3  (up to playerlevel+9)
-             *  all this capped at playerlevel=23; above player level 23, the level of class enemies will not be getting higher */            
+             *  10%-10%-10% chance of enemy at local difficulty level-4 .. .. LDL +3
+             *  10% chance of an enemy level lower than LDL-4 (down to LDL-10)
+             *  10% chance of an enemy level higher than LDL+3  (up to LDL+9)
+             *   ------ all this capped at playerlevel=23; above player level 23, the level of class enemies will not be getting higher */
             if (!GameManager.Instance.PlayerEnterExit.IsPlayerInsideDungeon)
             {
                 if (careerIndex != (int)MobileTypes.Knight_CityWatch)
                 {
-                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Player is not inside a dungeon and the entity is NOT a townguard: level-setting by random encounters method.");
-                    int effectivePlayerLevel = playerLevel;
-                    if (effectivePlayerLevel > 23) effectivePlayerLevel = 23; // cap                    
+                    SilentMessage("Player is not inside a dungeon and the entity is NOT a townguard: level-setting by random encounters method.");
+                    int localDifficultyLevel = 10;
+
+                    // int effectivePlayerLevel = playerLevel;                    
+                    // if (effectivePlayerLevel > 23) effectivePlayerLevel = 23; // cap                    
                     tempRandomVar = ourNumberGenerator.Next(0, 10);
                     int tempRandomVar2 = ourNumberGenerator.Next(0, 6);
 
-                    if (tempRandomVar == 0)
-                        entity.Level = playerLevel - 10 + tempRandomVar2;
-                    else if (tempRandomVar == 9)
-                        entity.Level = playerLevel + 4 + tempRandomVar2;
-                    else entity.Level = playerLevel - 4 + tempRandomVar - 1;
-                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("RND1 = "+ tempRandomVar + ", RND2=" + tempRandomVar2 + ":: Level set to " + entity.Level);
+                    switch (tempRandomVar)
+                    {
+                        case 0: entity.Level = localDifficultyLevel - 10 + tempRandomVar2;
+                            break;
+                        case 9: entity.Level = localDifficultyLevel + 4 + tempRandomVar2;
+                            break;
+                        default:
+                            entity.Level = localDifficultyLevel - 4 + tempRandomVar - 1;
+                            break;
+                    }
+                    SilentMessage("localDifficultyLevel=" + localDifficultyLevel + ", RND1 = "+ tempRandomVar + ", RND2=" + tempRandomVar2 + ":: Level set to " + entity.Level);
                 }
                 else  // for townguards
                 {
-                    MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Player is not inside a dungeon and the entity IS a townguard: setting level accordingly");
+                    SilentMessage("Player is not inside a dungeon and the entity IS a townguard: setting level accordingly");
                     //      If townguard, we implement a method like we have for dungeons :: Town Guard Quality Level
                     //  This quality level is contingent on the size and prominance of the town:
                     //      Daggerfall, Wayrest and Sentinel: base level of 21, like the hardest of dungeons as per Ralzar
@@ -511,7 +599,7 @@ namespace MTMMM
                 tempRandomVar = ourNumberGenerator.Next(0, 10);                                                     
 
                 int dungeonQualityLevel = MTMostlyMagicMod.dungeonQuality();
-                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Player is inside a dungeon type "+ MTMostlyMagicMod.dungeon+" of QL: "+ dungeonQualityLevel + " random number picked is "+ tempRandomVar);
+                SilentMessage("Player is inside a dungeon type "+ MTMostlyMagicMod.dungeon+" of QL: "+ dungeonQualityLevel + " random number picked is "+ tempRandomVar);
                 switch (tempRandomVar)
                 {
                     case 0:
@@ -538,12 +626,12 @@ namespace MTMMM
             if (excellenceRandomVar == 0)
             {
                 entity.Level -= 5;
-                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("This is an exceptionally weak enemy - e.g. a trainee at this place.");
+                SilentMessage("This is an exceptionally weak enemy - e.g. a trainee at this place.");
             }
             if (excellenceRandomVar == 19)
             {
                 entity.Level += 5;
-                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("This is an exceptionally strong enemy - e.g. an elite or trainer at this place.");
+                SilentMessage("This is an exceptionally strong enemy - e.g. an elite or trainer at this place.");
             }
 
             if (entity.Level < 1) entity.Level = 1;
@@ -569,12 +657,12 @@ namespace MTMMM
             if (isThisANewEnemy)
             {
                 entity.CurrentHealth = entity.MaxHealth;    
-                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("\tEntity level +" + entity.Level + ", Max Health set to " + entity.MaxHealth + ", since running for the first time, also set Current Health to " + entity.CurrentHealth);
+                SilentMessage("\tEntity level +" + entity.Level + ", Max Health set to " + entity.MaxHealth + ", since running for the first time, also set Current Health to " + entity.CurrentHealth);
             }
             else
-                MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("\tEntity level +" + entity.Level + ", Max Health set to " + entity.MaxHealth+ ", since not running for the first time in the given enemy, leaving Current Health alone");
+                SilentMessage("\tEntity level +" + entity.Level + ", Max Health set to " + entity.MaxHealth+ ", since not running for the first time in the given enemy, leaving Current Health alone");
 
-                // III. now, re-setting skills :: a max of 150 to make the strongest ones more difficult
+                // III. now, re-setting stats and skills :: a max of 150 for skills to make the strongest ones more difficult
             short skillsLevel = (short)((entity.Level * 4) + 34);
             if (skillsLevel > 150)
             {
@@ -586,7 +674,15 @@ namespace MTMMM
                 entity.Skills.SetPermanentSkillValue(i, skillsLevel);
             }
 
-            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("   Skills set to " + skillsLevel);            
+            int levelIncreaseInEnemyStats = (entity.Level - 1) * 2 / 3;
+            for (int i = 0; i < 8; i++)
+                entity.Stats.SetPermanentStatValue(i, entity.Stats.GetPermanentStatValue(i) + levelIncreaseInEnemyStats);
+                        // Stats now set based on not only career, but also level
+                        // This is a simplistic solution, TODO: sepparate spellcasters from non-spellcasters and set attributes individually
+
+            SilentMessage("   Skills set to " + skillsLevel+", Attributes increased by "+ levelIncreaseInEnemyStats);
+
+                
 
                 // IV. now, re-setting spells and max. magicka
             if (mobileEnemy.CastsMagic)
@@ -623,62 +719,7 @@ namespace MTMMM
             if (isThisANewEnemy)
                 // resetting equipemnt only needed if we are running on the given enemy for the first time
             {
-                for (int i = (int)EquipSlots.Head; i <= (int)EquipSlots.Feet; i++)       // does it include boots? ::  added equal, should be correct now ::                   TODO: check if it is correct this way.
-                {
-                    DaggerfallUnityItem item = entity.ItemEquipTable.GetItem((EquipSlots)i);
-                    if (item != null && item.ItemGroup == ItemGroups.Armor)
-                    {
-                        TextFile.Token[] tokens = ItemHelper.GetItemInfo(item, DaggerfallUnity.Instance.TextProvider);
-                        MacroHelper.ExpandMacros(ref tokens, item);
-                        string oldItemString = tokens[0].text + " (TI=" + item.TemplateIndex + ")";
-
-                        entity.ItemEquipTable.UnequipItem(item);
-
-                        int groupIndex = item.GroupIndex; // not sure this is necessary
-                        DaggerfallUnityItem item2 = ItemBuilder.CreateItem(ItemGroups.Armor, item.TemplateIndex);
-
-                        ItemBuilder.ApplyArmorSettings(item2, playerEntity.Gender, playerEntity.Race, getArmorMaterialFromNumber(getRandomItemMaterial(entity.Level)), item.CurrentVariant);
-                        // town guards can have better than steel        // TODO: re-evaluate if any penalty is appropriate for town guards;; probably so (classic has a cap: no better than steel)
-                        item2.currentCondition = item2.maxCondition * item.ConditionPercentage / 100;
-
-                        entity.Items.RemoveItem(item);
-                        entity.Items.AddItem(item2);
-                        entity.ItemEquipTable.EquipItem(item2, true, false);
-
-                        TextFile.Token[] tokens2 = ItemHelper.GetItemInfo(item2, DaggerfallUnity.Instance.TextProvider);
-                        MacroHelper.ExpandMacros(ref tokens2, item2);
-
-                        MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Instead of " + oldItemString + " added and equipped " + tokens2[0].text + " (TI=" + item2.TemplateIndex + ")");
-
-                    }
-
-                    if (item != null && item.ItemGroup == ItemGroups.Weapons)
-                    {
-                        TextFile.Token[] tokens = ItemHelper.GetItemInfo(item, DaggerfallUnity.Instance.TextProvider);
-                        MacroHelper.ExpandMacros(ref tokens, item);
-                        string oldItemString = tokens[0].text + " (TI=" + item.TemplateIndex + ")";
-
-                        entity.ItemEquipTable.UnequipItem(item);
-
-                        int groupIndex = item.GroupIndex;       // not sure this is necessary
-                        DaggerfallUnityItem item2 = ItemBuilder.CreateItem(ItemGroups.Weapons, item.TemplateIndex);
-
-                        ItemBuilder.ApplyWeaponMaterial(item2, getWeaponMaterialFromNumber(getRandomItemMaterial(entity.Level)));
-                        // town guards can have better than steel        // TODO: re-evaluate if any penalty is appropriate for town guards;; probably so (classic has a cap: no better than steel)
-                        item2.currentCondition = item2.maxCondition * item.ConditionPercentage / 100;
-
-                        item2.poisonType = item.poisonType;     // retain poison
-
-                        entity.Items.RemoveItem(item);
-                        entity.Items.AddItem(item2);
-                        entity.ItemEquipTable.EquipItem(item2, true, false);
-
-                        TextFile.Token[] tokens2 = ItemHelper.GetItemInfo(item2, DaggerfallUnity.Instance.TextProvider);
-                        MacroHelper.ExpandMacros(ref tokens2, item2);
-
-                        MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("Instead of " + oldItemString + " added and equipped " + tokens2[0].text + " (TI=" + item2.TemplateIndex + ") -- poisontype=" + item2.poisonType);
-                    }
-                }
+                SetEquipmentMaterials();
                 //Debug.Log("   Unequipped and removed " + listOfItemsToDisposeOf.Count+" items");      // TODO: reevaluate if such line is needed + disposing of unneeded items     
 
                 // recalculating armor stats

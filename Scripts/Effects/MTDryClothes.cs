@@ -20,6 +20,17 @@ namespace MTMMM
     public class MTDryClothes : BaseEntityEffect
     {
         public static readonly string EffectKey = "DryClothes";
+        static string messagePrefix = "MTDryClothes: ";
+
+        static void Message(string message)
+        {
+            MTMostlyMagicMod.Message(messagePrefix + message);
+        }
+
+        static void SilentMessage(string message)
+        {
+            MTMostlyMagicMod.SilentMessage(messagePrefix + message);
+        }
 
         public override void SetProperties()
         {
@@ -43,7 +54,7 @@ namespace MTMMM
 
             // Implement effect
             int magnitude = MMMFormulaHelper.GetSpellMagnitude(this, manager);
-            MMMFormulaHelper.MMMFormulaHelperInfoMessage("MTDryClothes: Decreasing wetness by " + magnitude+" points.");
+            Message("Decreasing wetness by " + magnitude+" points.");
                     // code to send the message to CLimates & Calories
         }
     }

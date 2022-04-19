@@ -21,8 +21,20 @@ namespace MTMMM
     public class MTUmbrella : IncumbentEffect
     {
         public static readonly string EffectKey = "Umbrella";
+        static string messagePrefix = "MTUmbrella: ";
 
         static Mod ccModInstance = null;
+
+        static void Message(string message)
+        {
+            MTMostlyMagicMod.Message(messagePrefix + message);
+        }
+
+        static void SilentMessage(string message)
+        {
+            MTMostlyMagicMod.SilentMessage(messagePrefix + message);
+        }
+
 
         public override void SetProperties()
         {
@@ -79,15 +91,15 @@ namespace MTMMM
 
             if (ccModInstance is null)
             {
-                MMMFormulaHelper.MMMFormulaHelperInfoMessage("Retrieving C&C mod instance.");
+                Message("Retrieving C&C mod instance.");
                 ccModInstance = ModManager.Instance.GetMod("Climates & Calories");
                 if (ccModInstance is null)
-                    MMMFormulaHelper.MMMFormulaHelperInfoMessage("Failed to retrieve C&C mod instance.");
+                    Message("Failed to retrieve C&C mod instance.");
                 else
-                    MMMFormulaHelper.MMMFormulaHelperInfoMessage("C&C mod instance retrieved successfully.");
+                    Message("C&C mod instance retrieved successfully.");
             }
 
-            MMMFormulaHelper.MMMFormulaHelperInfoMessage("Sending message to C&C that the umbrella is there.");
+            Message("Sending message to C&C that the umbrella is there.");
                 // Send appropriate message to C&C mod
         }
 
@@ -101,7 +113,7 @@ namespace MTMMM
             if (ccModInstance is null)
                 ccModInstance = ModManager.Instance.GetMod("Climates & Calories");
 
-            MMMFormulaHelper.MMMFormulaHelperInfoMessage("Sending message to C&C that the umbrella is no longer there.");
+            Message("Sending message to C&C that the umbrella is no longer there.");
                 // Send appropriate message to C&C mod
         }
     }

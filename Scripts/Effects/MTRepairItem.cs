@@ -26,9 +26,20 @@ namespace MTMMM
     public class MTRepairItem : BaseEntityEffect
     {
         public static readonly string EffectKey = "FixItem";
+        static string messagePrefix = "MTRepairItem: ";
 
         DaggerfallListPickerWindow itemPicker;
-        List<DaggerfallUnityItem> validRepairItems = new List<DaggerfallUnityItem>();        
+        List<DaggerfallUnityItem> validRepairItems = new List<DaggerfallUnityItem>();
+
+        static void Message(string message)
+        {
+            MTMostlyMagicMod.Message(messagePrefix + message);
+        }
+
+        static void SilentMessage(string message)
+        {
+            MTMostlyMagicMod.SilentMessage(messagePrefix + message);
+        }
 
         public override void SetProperties()
         {
@@ -130,7 +141,7 @@ namespace MTMMM
             if (maximumRepairAmount < repairAmount) repairAmount = maximumRepairAmount;
             itemToRepair.currentCondition += repairAmount;
 
-            MMMFormulaHelper.MMMFormulaHelperSilentInfoMessage("MTRepairItem : " + repairAmount + "condition points returned to item " + itemToRepair.LongName);
+            SilentMessage("MTRepairItem : " + repairAmount + "condition points returned to item " + itemToRepair.LongName);
 
             // Close picker and unsubscribe event
             UserInterfaceManager uiManager = DaggerfallUI.Instance.UserInterfaceManager;

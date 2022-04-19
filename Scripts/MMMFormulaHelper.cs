@@ -5,13 +5,13 @@
 // Big thanks to Gavin Clayton (interkarma@dfworkshop.net) for his suggestion to create this class. This will make things easier and be an asset as the mod becomes larger.
 
 /*
- * The code is sloppy at various places - this is partly due to the fact that this mod was created by merging three smaller mods.
- * Some things are redundant, comments are missing, some comments are not useful anymore etc.
+ * The code is sloppy at various places. Some things are redundant, comments are missing, some comments are not useful anymore etc.
  * I have the intention of cleaning it up in the future.
- * For now, it seems to work as intended or - let's rather say - reasonably well.
+ * For now, it seems to work as intended... or - let's rather say - reasonably well.
 */
 
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using DaggerfallConnect;
 using DaggerfallWorkshop.Game;
@@ -20,21 +20,62 @@ using DaggerfallWorkshop.Game.Formulas;
 using DaggerfallWorkshop.Game.MagicAndEffects;
 
 namespace MTMMM
-{
-    public delegate void MTDebugMethod (string s);
-    public delegate void MTSilentDebugMethod (string s);
-    public delegate int GetSpellLevelMethod(IEntityEffect effect);    
+{    
+    public delegate int GetSpellLevelMethod(IEntityEffect effect);
 
     public static class MMMFormulaHelper
     {
-        public static MTDebugMethod MMMFormulaHelperInfoMessage;
-        public static MTSilentDebugMethod MMMFormulaHelperSilentInfoMessage;
+        static string messagePrefix = "MMMFormulaHelper: ";
         public static bool SendInfoMessagesOnPCSpellLevel = false;
-        public static bool SendInfoMessagesOnNonPCSpellLevel = false;        
+        public static bool SendInfoMessagesOnNonPCSpellLevel = false;
 
         public static GetSpellLevelMethod GetSpellLevel = GetSpellLevel1;
 
         public static int castCostFloor;
+
+        public static List<SpellAttributeIncidence> effectIncidences;
+        public static List<SpellAttributeIncidence> targetTypeIncidences;
+        public static List<SpellAttributeIncidence> elementIncidences;
+
+
+        public struct SpellAttributeIncidence
+        {
+            public string Key;
+            public int Incidence;
+
+            public SpellAttributeIncidence(string key, int incidence = 0)
+            {
+                Key = key;
+                Incidence = incidence;
+            }
+        }
+
+        public static double[] IncidenceCoefficients = {4.0, 2.0, 1.41, 1}; 
+
+        public struct SpellAttributeIncidenceCoefficients
+        {
+            public double TargetTypeCoefficient;
+            public double ElementCoefficient;
+            public double EffectCoefficient;
+
+            public SpellAttributeIncidenceCoefficients(double targetTypeCoefficient=0.0, double elementCoefficient=0.0, double effectCoefficient = 0.0)
+            {
+                TargetTypeCoefficient = targetTypeCoefficient;
+                ElementCoefficient = effectCoefficient;
+                EffectCoefficient = effectCoefficient;
+            }
+        }
+
+
+        static void Message(string message)
+        {
+            MTMostlyMagicMod.Message(messagePrefix + message);
+        }
+
+        static void SilentMessage(string message)
+        {
+            MTMostlyMagicMod.SilentMessage(messagePrefix + message);
+        }
 
         /// <summary>
         /// Calculate the Chance of Success of an effect using the active Spell Level Calculation method. 
@@ -46,9 +87,8 @@ namespace MTMMM
                         
             int chanceToReturn = effect.Settings.ChanceBase + effect.Settings.ChancePlus * (int)Mathf.Floor(spellLevel / effect.Settings.ChancePerLevel);
 
-            if (MMMFormulaHelperInfoMessage != null)
-                MMMFormulaHelperInfoMessage(effect.Properties.Key+". ChanceBase =" + effect.Settings.ChanceBase + ", ChancePlus=" + effect.Settings.ChancePlus + " :: " +
-                    effect.Settings.ChanceBase + "+" + effect.Settings.ChancePlus + "*" + (int)Mathf.Floor(spellLevel / effect.Settings.ChancePerLevel) + " = " + chanceToReturn);
+            Message(effect.Properties.Key+". ChanceBase =" + effect.Settings.ChanceBase + ", ChancePlus=" + effect.Settings.ChancePlus + " :: " +
+                effect.Settings.ChanceBase + "+" + effect.Settings.ChancePlus + "*" + (int)Mathf.Floor(spellLevel / effect.Settings.ChancePerLevel) + " = " + chanceToReturn);      // TODO: re-eval if silent would be better
 
             //Debug.LogFormat("{5} ChanceValue {0} = base + plus * (level/chancePerLevel) = {1} + {2} * ({3}/{4})", settings.ChanceBase + settings.ChancePlus * (int)Mathf.Floor(casterLevel / settings.ChancePerLevel), settings.ChanceBase, settings.ChancePlus, casterLevel, settings.ChancePerLevel, Key);
             return chanceToReturn;
@@ -85,8 +125,7 @@ namespace MTMMM
             if (effect.ParentBundle.targetType != TargetTypes.CasterOnly)
                 magnitude = FormulaHelper.ModifyEffectAmount(effect, manager.EntityBehaviour.Entity, magnitude);
 
-            if (MMMFormulaHelperInfoMessage != null)
-                MMMFormulaHelperInfoMessage(messagePart + " (FINAL-MAG: "+ magnitude+")");
+            Message(messagePart + " (FINAL-MAG: "+ magnitude+")"); // TODO: re-eval if silent would be better
 
             return magnitude;
         }
@@ -101,16 +140,14 @@ namespace MTMMM
             {
                 int durationToReturn = effect.Settings.DurationBase + effect.Settings.DurationPlus * (int)Mathf.Floor(spellLevel / effect.Settings.DurationPerLevel);
 
-                if (MMMFormulaHelperInfoMessage != null)
-                    MMMFormulaHelperInfoMessage(effect.Properties.Key + ". DurationBase =" + effect.Settings.DurationBase + ", DurationPlus=" + effect.Settings.DurationPlus + " :: " +
-                        effect.Settings.DurationBase + "+" + effect.Settings.DurationPlus + "*" + (int)Mathf.Floor(spellLevel / effect.Settings.DurationPerLevel) + " = " + durationToReturn);
+                Message(effect.Properties.Key + ". DurationBase =" + effect.Settings.DurationBase + ", DurationPlus=" + effect.Settings.DurationPlus + " :: " +
+                    effect.Settings.DurationBase + "+" + effect.Settings.DurationPlus + "*" + (int)Mathf.Floor(spellLevel / effect.Settings.DurationPerLevel) + " = " + durationToReturn);
 
                 return durationToReturn;
             }
             else
             {
-                if (MMMFormulaHelperInfoMessage != null)
-                    MMMFormulaHelperInfoMessage(effect.Properties.Key + ". Duration = 0");
+                Message(effect.Properties.Key + ". Duration = 0");
                 return 0;
             }
 
@@ -213,8 +250,8 @@ namespace MTMMM
 
                     int skillLevel = caster.Entity.Level;       // base case, overriden every time the effect in question has a valid Magic Skill associated with it 
 
-                    if ((MMMFormulaHelperSilentInfoMessage != null) && (effect.Properties.MagicSkill == DFCareer.MagicSkills.None))
-                        MMMFormulaHelperSilentInfoMessage("Level being calculated for Player-cast spell effect with key '" + effect.Properties.Key + "', associated Magic Skill: '" + effect.Properties.MagicSkill+"'");
+                    if (effect.Properties.MagicSkill == DFCareer.MagicSkills.None)
+                        SilentMessage("Level being calculated for Player-cast spell effect with key '" + effect.Properties.Key + "', associated Magic Skill: '" + effect.Properties.MagicSkill+"'");
                             // this is to adapt to a change in DFU core - it seems that in dungeons (at least in Privateer's Hold) the game seeks to determine the level for a PC-cast effect with key Passive-Specials;
                             // for this Passive-Specials effect, effect.Properties.MagicSkill is equal to DFCareer.MagicSkills.None, in which case GetLiveSkillValue would throw an array index out of bounds exception
                             // TODO: if all goes well, consider removing this debug line
@@ -238,16 +275,16 @@ namespace MTMMM
                                        
                     casterLevel = Mathf.Max(1, Mathf.Min(skillLevel + luckPointsToSkillLevel, willpowerLevel+luckPointsToWillpowerLevel));
 
-                    if ((SendInfoMessagesOnPCSpellLevel) && (MMMFormulaHelperInfoMessage != null))
-                        MMMFormulaHelperSilentInfoMessage("Player-cast " + effect.Properties.Key + " effect (" + relevantSkill + ") level calculated: " + " OVERALL = " + casterLevel +
+                    if (SendInfoMessagesOnPCSpellLevel)
+                        SilentMessage("Player-cast " + effect.Properties.Key + " effect (" + relevantSkill + ") level calculated: " + " OVERALL = " + casterLevel +
                         ", SKILL: " + skillLevel+ ((luckPointsToSkillLevel>=0) ? "+" : "") +luckPointsToSkillLevel +
                         ", WILLPOWER = " + willpowerLevel+ ((luckPointsToWillpowerLevel >= 0) ? "+" : "") + luckPointsToWillpowerLevel+"");
                 }               // made player-cast effect info messages silent (found them to be quite disturbing during gameplay) - enemy spells will still be visible on the HUd too if relevant option ticked
                 else
                 {
                     casterLevel = caster.Entity.Level;
-                    if ((SendInfoMessagesOnNonPCSpellLevel) && (MMMFormulaHelperInfoMessage != null))                    
-                        MMMFormulaHelperInfoMessage("Non-player-cast " + effect.Properties.Key + " effect (" + relevantSkill + ") level: " + casterLevel);                    
+                    if (SendInfoMessagesOnNonPCSpellLevel)                    
+                        Message("Non-player-cast " + effect.Properties.Key + " effect (" + relevantSkill + ") level: " + casterLevel);                    
                 }
             }        
 
@@ -391,7 +428,7 @@ namespace MTMMM
             if (skillValue > 95) effectiveSkillValue = 95 + ((skillValue - 95) / 3);      // if over 95, spell effect costs should not go down as rapidly,
             if (effectiveSkillValue > 109) effectiveSkillValue = 109;                   //  instead, skill=137 and over should give a (110 - effectiveSkillValue) = 1
                                                                                                     
-            MMMFormulaHelperSilentInfoMessage("Effective Skill Value (effect key="+ effect.Key+") calculated = " + effectiveSkillValue);
+            SilentMessage("Effective Skill Value (effect key="+ effect.Key+") calculated = " + effectiveSkillValue);
 
             effectCost.spellPointCost = effectCost.goldCost * (110 - effectiveSkillValue) / 400;
 
@@ -414,21 +451,177 @@ namespace MTMMM
             return maxHealth;
         }
 
+        
+
+        public static void IncreaseIncidenceFor (string key, List<SpellAttributeIncidence> listToUpdate)
+        {
+            for (int i = 0; i < listToUpdate.Count; i++)
+                if (listToUpdate[i].Key == key)
+                {
+                    SpellAttributeIncidence incidenceToBeModified = listToUpdate[i];
+                    incidenceToBeModified.Incidence++;
+                    listToUpdate[i] = incidenceToBeModified;
+                    return;
+                }
+
+            listToUpdate.Add(new SpellAttributeIncidence(key, 1));
+        }        
+
+        public static void IncreaseEffectIncidenceFor (string key)
+        {
+            IncreaseIncidenceFor(key, effectIncidences);
+        }
+
+        public static void IncreaseTargetTypeIncidenceFor (TargetTypes targetType)
+        {
+            string key = ((int)targetType).ToString();
+            IncreaseIncidenceFor(key, targetTypeIncidences);
+        }
+
+        public static void IncreaseElementIncidenceFor(ElementTypes elementType)
+        {
+            string key = ((int)elementType).ToString();
+            IncreaseIncidenceFor(key, elementIncidences);
+        }
+
+        public static void CalculatePlayerSpellCharacteristicIncidences()
+        {
+            SilentMessage("CalculatePlayerSpellCharacteristicIncidences called");
+            effectIncidences = new List<SpellAttributeIncidence>();
+            targetTypeIncidences = new List<SpellAttributeIncidence>();
+            elementIncidences = new List<SpellAttributeIncidence>();        // reseting work lists
+
+            EffectBundleSettings[] playerSpells = GameManager.Instance.PlayerEntity.GetSpells();
+
+            for (int i = 0; i < playerSpells.Length; i++)
+            {
+                IncreaseTargetTypeIncidenceFor(playerSpells[i].TargetType);
+                IncreaseElementIncidenceFor(playerSpells[i].ElementType);
+
+                EffectEntry[] spellEffects = playerSpells[i].Effects;
+                for (int j = 0; j < spellEffects.Length; j++)
+                    IncreaseEffectIncidenceFor(spellEffects[j].Key);
+            }
+        }
+
+        public static string GetSpellAttributeIncidenceTableString(List<SpellAttributeIncidence> listToPrint)
+        {
+            string tempString = "";
+            for (int i = 0; i < listToPrint.Count; i++)
+                tempString += "'" + listToPrint[i].Key + "'=" + listToPrint[i].Incidence + "  ";
+            return tempString;
+        }
+
+        public static string ReturnSpellAttributeIncidencesString(bool recalculateBeforePrinting = true)
+        {
+            SilentMessage("PrintSpellAttributeIncidencesToPlayer called");
+            if (recalculateBeforePrinting) CalculatePlayerSpellCharacteristicIncidences();
+
+            string incidenceString = "Printing Player SpellBook Incidences." + Environment.NewLine +
+                "\t\tEFFECTS. " + GetSpellAttributeIncidenceTableString(effectIncidences) + Environment.NewLine +
+                "\t\tTARGET-TYPES. " + GetSpellAttributeIncidenceTableString(targetTypeIncidences) + Environment.NewLine +
+                "\t\tELEMENTS. " + GetSpellAttributeIncidenceTableString(elementIncidences);
+
+            return incidenceString;
+        }
+
+        public static int GetIncidenceFor(string key, List<SpellAttributeIncidence> listToCheck)
+        {
+            for (int i = 0; i < listToCheck.Count; i++)
+                if (listToCheck[i].Key == key)
+                {
+                    // SilentMessage("Key '" + key + "' found in table. Incidence returned: " + listToCheck[i].Incidence);
+                    return listToCheck[i].Incidence;
+                }
+            // SilentMessage("Key not found in table, returning 0.");
+            return 0;
+        }
+
+        public static int GetEffectIncidenceFor(string key)
+        {
+            // SilentMessage("GetEffectIncidenceFor called, key=" + key);
+            return GetIncidenceFor(key, effectIncidences);
+        }
+
+        public static int GetTargetTypeIncidenceFor(TargetTypes targetType)
+        {
+            string key = ((int)targetType).ToString();
+            // SilentMessage("GetTargetTypeIncidenceFor called, key=" + key);
+            return GetIncidenceFor(key, targetTypeIncidences);
+        }
+
+        public static int GetElementIncidenceFor(ElementTypes elementType)
+        {
+            string key = ((int)elementType).ToString();
+            // SilentMessage("GetElementIncidenceFor called, key=" + key);
+            return GetIncidenceFor(key, elementIncidences);
+        }
+
+        public static SpellAttributeIncidenceCoefficients CalculateSpellAttributeIncidenceCoefficients(EffectBundleSettings spell)
+        {
+            // SilentMessage("CalculateSpellAttributeIncidenceCoefficients called.");
+            string calculationDetailsString = "";
+            CalculatePlayerSpellCharacteristicIncidences();
+            SilentMessage(ReturnSpellAttributeIncidencesString(false));     // no need to do recalculation again, explicitly done via previous line
+
+            SpellAttributeIncidenceCoefficients coefficientsToReturn = new SpellAttributeIncidenceCoefficients();
+
+            coefficientsToReturn.TargetTypeCoefficient = IncidenceCoefficients[Math.Min(GetTargetTypeIncidenceFor(spell.TargetType), 3)];            
+            coefficientsToReturn.ElementCoefficient = IncidenceCoefficients[Math.Min(GetElementIncidenceFor(spell.ElementType), 3)];
+            coefficientsToReturn.EffectCoefficient = IncidenceCoefficients[3];
+
+            for (int i = 0; i < spell.Effects.Length; i++)
+                coefficientsToReturn.EffectCoefficient = Math.Max(coefficientsToReturn.EffectCoefficient, IncidenceCoefficients[Math.Min(GetEffectIncidenceFor(spell.Effects[i].Key), 3)]);
+                
+            return coefficientsToReturn;       
+        }
+
+        public static int CalculateSpellCreationTimeCost(EffectBundleSettings spell, bool spellMaker=false)
+        {
+
+            SilentMessage("CalculateSpellCreationTimeCost called with spellMaker=" + spellMaker);
+            FormulaHelper.SpellCost tmpSpellCost = FormulaHelper.CalculateTotalEffectCosts(spell.Effects, spell.TargetType, null, spell.MinimumCastingCost);
+            double magickaCost = tmpSpellCost.spellPointCost;             
+            double spellMakerCoefficient = 1.0;
+            if (spellMaker)
+                spellMakerCoefficient = 4.0;
+
+            SilentMessage("magickaCost for the spell calculated: " + magickaCost+ ", spellMakerCoefficient: "+spellMakerCoefficient);
+
+            // If SpellpointCost == Intelligence, TargetType and Element maximally familiar and effect unknown, the returned time period should be 10 hours = 600 minutes
+            // If SpellpointCost < INT / 5, the returned time period should be 24 minutes                   (1)   f(1/5) = 24
+            // the transition should not be linear, rather parabolic or hyperbolic                              f(x) = 600 * x^2
+            // the above serves only as hints as to how I designed the function - the number have been tweaked since then
+
+            int ourLiveIntelligence = GameManager.Instance.PlayerEntity.Stats.LiveIntelligence;
+            double intelligenceRatio = magickaCost / (double)ourLiveIntelligence;
+            SpellAttributeIncidenceCoefficients spellAttributeIncidenceCoefficients = CalculateSpellAttributeIncidenceCoefficients(spell);
+            SilentMessage("intelligence: "+ourLiveIntelligence+" intelligenceRatio: " + intelligenceRatio + ", incidencecoefficients [eff,elem,targ]: [" +
+                spellAttributeIncidenceCoefficients.EffectCoefficient+", "+spellAttributeIncidenceCoefficients.ElementCoefficient+", "+
+                spellAttributeIncidenceCoefficients.TargetTypeCoefficient+"]");
+
+            int spellLearningTimeCost = Math.Max(trunc(600 /4 /2 * intelligenceRatio * intelligenceRatio * spellAttributeIncidenceCoefficients.EffectCoefficient *
+                spellAttributeIncidenceCoefficients.ElementCoefficient * spellAttributeIncidenceCoefficients.TargetTypeCoefficient * spellMakerCoefficient), 12); 
+
+            SilentMessage("LiveINT=" + ourLiveIntelligence + ", magickaCost=" + magickaCost +
+                ", IntelligenceRatio=" + intelligenceRatio + ", TimeCost=" + spellLearningTimeCost);
+            return spellLearningTimeCost;
+        }
+
+        
+        /*          Previous version - keeping for reference purposes
         /// <summary>
         /// Calculates the time it takes for PC to learn a spell with the given magicka cost, in minutes
         /// </summary>
         public static int CalculateSpellLearningTimeCost(double magickaCost)
         {
-            // Theoretical maximum for learning a spell is SpellPointCost <= Intelligence
-            // If SpellpointCost == Intelligence, the returned time period should be 10 hours = 600 minutes (5)   f(1)   = 600
-            // If SpellpointCost < INT / 5, the returned time period should be 24 minutes                   (1)   f(1/5) = 24
-            // the transition should not be linear, rather parabolic or hyperbolic                              f(x) = 600 * x^2
+            
             int ourLiveIntelligence = GameManager.Instance.PlayerEntity.Stats.LiveIntelligence;
             double intelligenceRatio = magickaCost / (double)ourLiveIntelligence;
             int spellLearningTimeCost = Math.Max(trunc(600 * intelligenceRatio * intelligenceRatio), 24);        // establish a minimum of 24 minutes
-            MMMFormulaHelperSilentInfoMessage("CalculateSpellLearningTimeCost: LiveINT=" + ourLiveIntelligence+", magickaCost="+magickaCost+
+            SilentMessage("CalculateSpellLearningTimeCost: LiveINT=" + ourLiveIntelligence+", magickaCost="+magickaCost+
                 ", IntelligenceRatio="+intelligenceRatio+", TimeCost="+spellLearningTimeCost);
             return spellLearningTimeCost;
-        }
+        }  */
     }
 }
