@@ -84,11 +84,11 @@ namespace MTMMM
             if (randomNumber < 1023) return 10;
                 return 11;
         }
-            // from 1 to 13 
+            // from 1 to 15 
         static int clampItemCategory (int categoryNumber)
         {
             if (categoryNumber < 1) return 1;
-            if (categoryNumber > 16) return 16;
+            if (categoryNumber > 15) return 15;
             return categoryNumber;
         }
 
@@ -126,22 +126,21 @@ namespace MTMMM
         {
             switch (number)
             {
-                case 1: return WeaponMaterialTypes.Iron;
-                case 2: 
-                case 3: return WeaponMaterialTypes.Steel;
-                case 4:
-                case 5: return WeaponMaterialTypes.Silver;
-                case 6: return WeaponMaterialTypes.Elven;
-                case 7: return WeaponMaterialTypes.Dwarven;
-                case 8:
+                case 1: 
+                case 2: return WeaponMaterialTypes.Iron;        // LVL1-6
+                case 3: 
+                case 4: return WeaponMaterialTypes.Steel;       // LVL7-12
+                case 5: return WeaponMaterialTypes.Silver;      // LVL13-15
+                case 6: 
+                case 7: return WeaponMaterialTypes.Elven;
+                case 8: return WeaponMaterialTypes.Dwarven;                                        // LVL22-24
                 case 9: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? WeaponMaterialTypes.Orcish : WeaponMaterialTypes.Mithril;
                 case 10: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? WeaponMaterialTypes.Mithril : WeaponMaterialTypes.Adamantium;
-                case 11: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? WeaponMaterialTypes.Adamantium : WeaponMaterialTypes.Ebony;
-                case 12:                
-                case 13: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? WeaponMaterialTypes.Ebony : WeaponMaterialTypes.Orcish;
-                case 14:
-                case 15:
-                case 16: return WeaponMaterialTypes.Daedric;
+                case 11: 
+                case 12: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? WeaponMaterialTypes.Adamantium : WeaponMaterialTypes.Ebony;
+                case 13: 
+                case 14: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? WeaponMaterialTypes.Ebony : WeaponMaterialTypes.Orcish;
+                case 15: return WeaponMaterialTypes.Daedric;                
 
                 default: return WeaponMaterialTypes.Iron;   // possibly change in the future for debug purposes
             }
@@ -151,22 +150,21 @@ namespace MTMMM
         {
             switch (number)
             {
-                case 1: return ArmorMaterialTypes.Leather;
-                case 2: return ArmorMaterialTypes.Chain;
-                case 3: return ArmorMaterialTypes.Iron;
-                case 4: return ArmorMaterialTypes.Steel;
-                case 5:
-                case 6: return ArmorMaterialTypes.Silver;
-                case 7: return ArmorMaterialTypes.Elven;
-                case 8: return ArmorMaterialTypes.Dwarven;
-                case 9:
-                case 10: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? ArmorMaterialTypes.Orcish : ArmorMaterialTypes.Mithril;
-                case 11: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? ArmorMaterialTypes.Mithril : ArmorMaterialTypes.Adamantium;
+                case 1: return ArmorMaterialTypes.Leather;      // LVL1-3
+                case 2: return ArmorMaterialTypes.Chain;        // LVL4-6
+                case 3: return ArmorMaterialTypes.Iron;         // LVL7-9
+                case 4: return ArmorMaterialTypes.Steel;        // LVL10-12
+                case 5: return ArmorMaterialTypes.Silver;       // LVL13-15
+                case 6: 
+                case 7: return ArmorMaterialTypes.Elven;        // LVL16-21
+                case 8: return ArmorMaterialTypes.Dwarven;      // LVL22-24
+                case 9: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? ArmorMaterialTypes.Orcish : ArmorMaterialTypes.Mithril;
+                case 10: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? ArmorMaterialTypes.Mithril : ArmorMaterialTypes.Adamantium;
+                case 11: 
                 case 12: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? ArmorMaterialTypes.Adamantium : ArmorMaterialTypes.Ebony;
-                case 13:
+                case 13: 
                 case 14: return (MTMostlyMagicMod.region == (int)DaggerfallRegions.OrsiniumArea) ? ArmorMaterialTypes.Ebony : ArmorMaterialTypes.Orcish;
-                case 15:
-                case 16: return ArmorMaterialTypes.Daedric;
+                case 15: return ArmorMaterialTypes.Daedric;               
 
                 default: return ArmorMaterialTypes.Leather;   // possibly change in the future for debug purposes
             }
