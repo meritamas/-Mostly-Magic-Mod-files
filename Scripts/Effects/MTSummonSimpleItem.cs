@@ -3,7 +3,7 @@
 // License:         MIT License (http://www.opensource.org/licenses/mit-license.php)
 // Author:          meritamas (meritamas@outlook.com)
 
-// Class is based on the Teleport class which is part of the Daggerfall Tools For Unity project - many parts retained unchanged
+// Class is based on the Create Item class which is part of the Daggerfall Tools For Unity project - many parts retained unchanged
 // Project:         Daggerfall Tools For Unity
 // Copyright:       Copyright (C) 2009-2021 Daggerfall Workshop
 // Web Site:        http://www.dfworkshop.net
@@ -30,6 +30,12 @@ namespace MTMMM
     public class MTSummonSimpleItem : BaseEntityEffect
     {
         public static readonly string EffectKey = "CreateItem";
+
+        public override string GroupName
+        {
+            get { return EffectKey; }
+        }
+
         static string messagePrefix = "MTSummonSimpleItem: ";
 
         DaggerfallListPickerWindow itemPicker;

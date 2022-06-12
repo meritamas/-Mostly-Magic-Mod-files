@@ -20,6 +20,7 @@
 
 using UnityEngine;
 using DaggerfallConnect;
+using DaggerfallConnect.Arena2;
 using DaggerfallWorkshop;
 using DaggerfallWorkshop.Game;
 using DaggerfallWorkshop.Game.Entity;
@@ -38,8 +39,23 @@ namespace MTMMM
     /// </summary>
     public class MTTeleport : IncumbentEffect
     {
-        static string messagePrefix = "MTTeleport: ";
+        public static bool DispelDoesNotRemoveAnchors = false;      // false means that Dispel DOES remove anchors        
+        static string messagePrefix = "MTTeleport: ";        
         public static readonly string EffectKey = "Teleport-Effect";
+        
+        public static TextFile.Token[] ourSpellMakerDescription = new TextFile.Token[] {
+            new TextFile.Token(TextFile.Formatting.Text, "Teleport Effect."),
+            new TextFile.Token(TextFile.Formatting.JustifyCenter, null),
+            new TextFile.Token(TextFile.Formatting.Text, "Give the player a choice to create a new anchor or to teleport to one of his anchors already in place."),
+            new TextFile.Token(TextFile.Formatting.JustifyCenter, null),            
+            new TextFile.Token(TextFile.Formatting.NewLine, null),
+            new TextFile.Token(TextFile.Formatting.Text, "The spell will increasingly grow in effectiveness - number of anchors and chances of success - with spell level."),
+            new TextFile.Token(TextFile.Formatting.JustifyCenter, null),
+            new TextFile.Token(TextFile.Formatting.Text, "Magnitude: N/A, Chance: N/A, Duration: N/A"),
+            new TextFile.Token(TextFile.Formatting.JustifyCenter, null)
+        };
+        public static TextFile.Token[] OurSpellMakerDescription() { return ourSpellMakerDescription; }
+
         public static readonly string WhatToDoMessageText = "As you feel magic powers flow through your body, you direct them to...";
         public static readonly string AnchorCreationFailedText = "Despite your best efforts, the mystical connection between you and this place does not feel stable and strong enough.";
         public static readonly string PleaseNameYourAnchorText = "You sense that there now exists a stable mysterious connection between you and this place. You will invoke this connection by focusing on ";
@@ -59,9 +75,9 @@ namespace MTMMM
         const int achorMustBeSet = 4001;        
 
         // Effect data to serialize
-        int numberOfAnchorsSet = 0;
-        PlayerPositionData_v1[] anchorPositions = new PlayerPositionData_v1[maximumNumberOfAnchors];
-        string[] anchorNames = new string [maximumNumberOfAnchors];
+        static int numberOfAnchorsSet = 0;
+        static PlayerPositionData_v1[] anchorPositions = new PlayerPositionData_v1[maximumNumberOfAnchors];
+        static string[] anchorNames = new string [maximumNumberOfAnchors];
         int forcedRoundsRemaining = 1;
 
         // Volatile references
@@ -85,6 +101,15 @@ namespace MTMMM
             properties.ShowSpellIcon = false;
             properties.MagicSkill = DFCareer.MagicSkills.Mysticism;
         }
+
+
+
+        public override string GroupName
+        {
+            get { return EffectKey; }
+        }       // TODO: put this in order or won't work in SpellMaker
+        public override TextFile.Token[] SpellMakerDescription => OurSpellMakerDescription();
+        public override TextFile.Token[] SpellBookDescription => OurSpellMakerDescription();
 
         protected override int RemoveRound()
         {
@@ -133,13 +158,16 @@ namespace MTMMM
 
         public void Kill()
         {
-            for (int i=0; i<maximumNumberOfAnchors; i++)
-                if (anchorPositions[i]!=null)
-                {
-                    anchorPositions[i] = null;
-                    anchorNames[i] = null;
-                    numberOfAnchorsSet--;
-                }
+            if (!DispelDoesNotRemoveAnchors)            // only remove anchors if not told otherwise by user through mod settings
+            {
+                for (int i = 0; i < maximumNumberOfAnchors; i++)
+                    if (anchorPositions[i] != null)
+                    {
+                        anchorPositions[i] = null;
+                        anchorNames[i] = null;
+                        numberOfAnchorsSet--;
+                    }
+            }
 
             forcedRoundsRemaining = 0;
             ResignAsIncumbent();

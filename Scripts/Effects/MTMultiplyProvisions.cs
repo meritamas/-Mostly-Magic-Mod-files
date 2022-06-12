@@ -25,6 +25,33 @@ namespace MTMMM
     public class MTMultiplyProvisions : BaseEntityEffect
     {
         public static readonly string EffectKey = "MultiplyProvisions";
+
+        public static TextFile.Token[] ourSpellMakerDescription = new TextFile.Token[] {
+            new TextFile.Token(TextFile.Formatting.Text, "Multiply Provisions"),
+            new TextFile.Token(TextFile.Formatting.JustifyCenter, null),
+            new TextFile.Token(TextFile.Formatting.Text, "If you have some of a provision (water, rations, arrows), this effect can add to the provision through conjuration."),
+            new TextFile.Token(TextFile.Formatting.JustifyCenter, null),
+            new TextFile.Token(TextFile.Formatting.Text, "Will work better when physically near to things that is being conjured up. (E.g. settlements, homes, temples)"),
+            new TextFile.Token(TextFile.Formatting.JustifyCenter, null),
+            new TextFile.Token(TextFile.Formatting.NewLine, null),
+            new TextFile.Token(TextFile.Formatting.Text, "Target: an item that the player is conjuring up"),
+            new TextFile.Token(TextFile.Formatting.JustifyCenter, null),
+            new TextFile.Token(TextFile.Formatting.Text, "Magnitude: has an exponential effect on how much new provisions are added"),
+            new TextFile.Token(TextFile.Formatting.JustifyCenter, null),
+            new TextFile.Token(TextFile.Formatting.Text, "(strong spells will generate increasingly bigger increases)"),
+            new TextFile.Token(TextFile.Formatting.JustifyCenter, null),
+            new TextFile.Token(TextFile.Formatting.Text, "Chance: N/A, Duration: N/A"),
+            new TextFile.Token(TextFile.Formatting.JustifyCenter, null)
+        };
+        public static TextFile.Token[] OurSpellMakerDescription() { return ourSpellMakerDescription; }
+
+        public override string GroupName
+        {
+            get { return EffectKey; }
+        }
+        public override TextFile.Token[] SpellMakerDescription => OurSpellMakerDescription();
+        public override TextFile.Token[] SpellBookDescription => OurSpellMakerDescription();
+
         static string messagePrefix = "MTMultiplyProvisions: ";
         public static float minimumModifier = 0.75F;
         public static float maximumModifier = 1.33F;

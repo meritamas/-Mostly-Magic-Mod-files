@@ -67,6 +67,46 @@ namespace MTMMM
             MTMostlyMagicMod.SilentMessage(messagePrefix + message);
         }
 
+        public static int GetWorldClimateDiffucultyModifier()
+        {
+            // Set based on world climate
+            switch (GameManager.Instance.PlayerGPS.CurrentClimateIndex)
+            {
+                case (int)MapsFile.Climates.Ocean:   // Ocean
+                    return 0;
+                    break;
+                case (int)MapsFile.Climates.Desert:
+                case (int)MapsFile.Climates.Desert2:
+                    return 5;                               // TODO: more difficult in summertime
+                                                            // TODO: later on: more difficult if surrounded by desert
+                    break;
+                case (int)MapsFile.Climates.Mountain:
+                    return 5;                               // TODO: more difficult in winter, more difficult based on pixel height, more difficult if surronded by mountains
+                    break;
+                case (int)MapsFile.Climates.Rainforest:
+                    return 5;                               // TODO: more difficult in rain season, more difficult if surrounded by rainforest
+                    break;
+                case (int)MapsFile.Climates.Swamp:
+                    return 5;
+                    break;
+                case (int)MapsFile.Climates.Subtropical:
+                    return 0;
+                    break;
+                case (int)MapsFile.Climates.MountainWoods:
+                    return 5;                               // TODO: more difficult in winter, more difficult based on pixel height, more difficult if surronded by mountains
+                    break;
+                case (int)MapsFile.Climates.Woodlands:
+                    return 0;
+                    break;
+                case (int)MapsFile.Climates.HauntedWoodlands:
+                    return +10;
+                    break;
+                default:
+                    return 0;
+                    break;
+            }
+        }
+
 
         int getItemMaterialRandomDeviation()
         {
@@ -512,7 +552,8 @@ namespace MTMMM
                 if (careerIndex != (int)MobileTypes.Knight_CityWatch)
                 {
                     SilentMessage("Player is not inside a dungeon and the entity is NOT a townguard: level-setting by random encounters method.");
-                    int localDifficultyLevel = 10;
+                    int localDifficultyLevel = 10 + GetWorldClimateDiffucultyModifier();
+                                // will now take into account map pixel climate (mount, desert, swamp, hauntedforest should be more difficult)
 
                     // int effectivePlayerLevel = playerLevel;                    
                     // if (effectivePlayerLevel > 23) effectivePlayerLevel = 23; // cap                    

@@ -10,6 +10,7 @@
 using System;
 using System.Collections.Generic;
 using DaggerfallConnect;
+using DaggerfallWorkshop;
 using DaggerfallWorkshop.Game;
 using DaggerfallConnect.Arena2;
 using DaggerfallWorkshop.Game.Entity;
@@ -26,6 +27,29 @@ namespace MTMMM
     public class MTRepairItem : BaseEntityEffect
     {
         public static readonly string EffectKey = "FixItem";
+        public static TextFile.Token[] ourSpellMakerDescription = new TextFile.Token[] {
+            new TextFile.Token(TextFile.Formatting.Text, "Fix Item"),
+            new TextFile.Token(TextFile.Formatting.JustifyCenter, null),
+            new TextFile.Token(TextFile.Formatting.Text, "Capable of fixing mundane items, will restore simpler (e.g. leather, iron, steel) items faster."),
+            new TextFile.Token(TextFile.Formatting.JustifyCenter, null),
+            new TextFile.Token(TextFile.Formatting.NewLine, null),
+            new TextFile.Token(TextFile.Formatting.Text, "Target: an item already in the player's inventory"),
+            new TextFile.Token(TextFile.Formatting.JustifyCenter, null),
+            new TextFile.Token(TextFile.Formatting.Text, "Magnitude: has a linear effect on how much the target item is restored"),
+            new TextFile.Token(TextFile.Formatting.JustifyCenter, null),
+            new TextFile.Token(TextFile.Formatting.Text, "Chance: N/A, Duration: N/A"),
+            new TextFile.Token(TextFile.Formatting.JustifyCenter, null)
+        };
+        public static TextFile.Token[] OurSpellMakerDescription() { return ourSpellMakerDescription; }
+
+
+        public override string GroupName
+        {
+            get { return EffectKey; }
+        }
+        public override TextFile.Token[] SpellMakerDescription => OurSpellMakerDescription();
+        public override TextFile.Token[] SpellBookDescription => OurSpellMakerDescription();
+
         static string messagePrefix = "MTRepairItem: ";
 
         DaggerfallListPickerWindow itemPicker;
@@ -39,6 +63,11 @@ namespace MTMMM
         static void SilentMessage(string message)
         {
             MTMostlyMagicMod.SilentMessage(messagePrefix + message);
+        }
+
+        public static void SilentMessage(string message, params object[] args)
+        {
+            MTMostlyMagicMod.SilentMessage(messagePrefix + message, args);
         }
 
         public override void SetProperties()
@@ -123,25 +152,139 @@ namespace MTMMM
             uiManager.PushWindow(itemPicker);
         }
 
-        private void ItemPicker_OnItemPicked(int index, string itemString)      
-        {
-            DaggerfallUnityItem itemToRepair = validRepairItems[index];
-            int repairPerMagnitude = UnityEngine.Random.Range(47, 52);      // this ensures that the spell does not restore the exact same amount of condition points each time
-            int maximumRepairAmount = repairPerMagnitude * MMMFormulaHelper.GetSpellMagnitude(this, manager);
-            /*  about the coefficient :: The basic idea is as follows - some basic calculations and then reverse-engineer from that
+        /*  about the coefficient :: The basic idea is as follows - some basic calculations and then reverse-engineer from that
              *  with the same parameters, it should replenish the condition of a Steel Cuirass like the Stamina spell replenishes Fatigue for an "average character"
              *  concretely: at LVL 15, Stamina (1-8 + 2/LVL) recharges about 35, an "average character" for our purposes could be one with END 70 and STR 70, so max fatigue = 140
              *  so, at LVL 15, it takes about 4 Stamina spells to fully recharge fatigue
-             *  so, at LVL 15, it should take a similar (1-8 + 2/LVL) RepairItem spell about four times to recharge the condition of a Steel Cuirass 
+             *  so, at LVL 15, it should take a similar (1-8 + 2/LVL) RepairItem spell about four times to recharge the condition of a Steel Cuirass             *  
              *  so, a RepairItem spell with a magnitude of 35 should take four iterations to completely refill 6300
              *  from this, it follows that one magnitude of the spell should bring about 45 points of condition restored to an item (45*35*4 = 6300) 
-                45 rounded to the nearest ten, that is 50 */
+                45 rounded to the nearest ten, that is 50
 
-            int repairAmount = itemToRepair.maxCondition - itemToRepair.currentCondition;
-            if (maximumRepairAmount < repairAmount) repairAmount = maximumRepairAmount;
+                One more twist (Or two).
+                1. It should be more and more difficult to repair an item, the more damaged it is.
+                So, the range of 0->10% should require energy equal to:
+                    - 10%->30%
+                    - 30%->60%
+                    - 60%->100%
+                2. This being a light spell designed for mundane, everyday items, it should be increasingly difficult to repair items of higher materials. */
+
+            /// <summary>
+            /// Gets the effective material difference between the Item's material and Steel
+            /// </summary>
+            /// <param name="item">Needs to be a weapon or armor piece.</param>
+            /// <returns></returns>
+        private int GetMaterialModifier(DaggerfallUnityItem item)
+        {
+            int material = item.NativeMaterialValue;
+
+            if (item.ItemGroup == ItemGroups.Armor)     // if armor
+            {
+                switch (material)
+                {
+                    case (int) ArmorMaterialTypes.Leather:
+                    case (int) ArmorMaterialTypes.Chain:
+                    case (int)ArmorMaterialTypes.Chain2:
+                    case (int)ArmorMaterialTypes.Iron:
+                    case (int)ArmorMaterialTypes.Steel:
+                        return 0;
+                        break;
+                    default:
+                        return material % 256;
+                        /*if (material < 256)
+                            return material - (int)WeaponMaterialTypes.Steel;
+                        else
+                            return material - (int)ArmorMaterialTypes.Steel;*/
+                }
+            }
+            else            // if weapon            
+            {
+                switch (material)
+                {
+                    case (int)WeaponMaterialTypes.Iron:
+                    case (int)WeaponMaterialTypes.Steel:
+                        return 0;
+                        break;
+                    default:
+                        return material - (int)WeaponMaterialTypes.Steel;
+                }
+            }
+        }
+
+        private int CalculatePointsToReturn(DaggerfallUnityItem item, int magnitude)
+        {
+            double baseRepairPerMagnitude = UnityEngine.Random.Range(77, 82);      // this ensures that the spell does not restore the exact same amount of condition points each time            
+            int magnitudePointsLeft = magnitude;
+
+            double currentCondition = item.currentCondition;
+            int maxCondition = item.maxCondition;
+            double threshold10 = maxCondition / 10;
+            double threshold30 = maxCondition * 3 / 10;
+            double threshold60 = maxCondition * 6 / 10;
+            double repairPerMagnitude = 0;      // should be subsequently overridden each time
+
+            DFCareer.Skills skill = item.GetWeaponSkillID();
+            if (item.ItemGroup == ItemGroups.Armor || skill == DFCareer.Skills.ShortBlade || skill == DFCareer.Skills.LongBlade ||
+                skill == DFCareer.Skills.Axe || skill == DFCareer.Skills.BluntWeapon || skill == DFCareer.Skills.Archery)   // if weapon or armor
+            {
+                int materialModifier = GetMaterialModifier(item);
+                repairPerMagnitude = baseRepairPerMagnitude * Math.Pow(0.5, materialModifier / 2);
+                SilentMessage("Armor/Weapon: material {0}, calculated repairPerMagnitude {1}", item.NativeMaterialValue, repairPerMagnitude);
+            }                
+            
+            if (item.ItemGroup == ItemGroups.MensClothing || item.ItemGroup == ItemGroups.WomensClothing || item.TemplateIndex == 530)
+                        // 530 being the camping equipment intruduced by Climates & Calories
+            {
+                repairPerMagnitude = 4;
+                SilentMessage("NOT Armor/Weapon: repairPerMagnitude set at {0}", repairPerMagnitude);
+            }
+
+            do
+            {
+                SilentMessage("WHILE: MagPointsLeft = {0}, CurrentCondition = {1}", magnitudePointsLeft, currentCondition);
+                magnitudePointsLeft--;
+
+                if (currentCondition < threshold10)
+                {
+                    currentCondition += repairPerMagnitude * 0.25;
+                    continue;
+                }
+
+                if (currentCondition < threshold30)
+                {
+                    currentCondition += repairPerMagnitude * 0.5;
+                    continue;
+                }
+
+                if (currentCondition < threshold60)
+                {
+                    currentCondition += repairPerMagnitude * 0.75;
+                    continue;
+                }
+
+                currentCondition += repairPerMagnitude;
+            } while (currentCondition < maxCondition && magnitudePointsLeft > 0);
+
+            SilentMessage("Exiting while loop with {0} magnitude points left and CurrentCondition at {1}", magnitudePointsLeft, currentCondition);
+            int currentConditionInt = Convert.ToInt32(currentCondition);
+            
+            return Math.Min(currentConditionInt, maxCondition) - item.currentCondition;
+        }
+
+        private void ItemPicker_OnItemPicked(int index, string itemString)      
+        {
+            DaggerfallUnityItem itemToRepair = validRepairItems[index];
+            
+            //int maximumRepairAmount = repairPerMagnitude * ;
+
+
+            int repairAmount = CalculatePointsToReturn(itemToRepair, MMMFormulaHelper.GetSpellMagnitude(this, manager));
+
+                        // code to prevent 'overcharging' the item  -- there in CalculatePointsToReturn - TODO: consider moving it here
+
             itemToRepair.currentCondition += repairAmount;
 
-            SilentMessage("MTRepairItem : " + repairAmount + "condition points returned to item " + itemToRepair.LongName);
+            SilentMessage("MTRepairItem : " + repairAmount + " condition points returned to item " + itemToRepair.LongName);
 
             // Close picker and unsubscribe event
             UserInterfaceManager uiManager = DaggerfallUI.Instance.UserInterfaceManager;

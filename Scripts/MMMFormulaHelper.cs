@@ -12,6 +12,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using UnityEngine;
 using DaggerfallConnect;
 using DaggerfallWorkshop.Game;
@@ -28,44 +29,22 @@ namespace MTMMM
         static string messagePrefix = "MMMFormulaHelper: ";
         public static bool SendInfoMessagesOnPCSpellLevel = false;
         public static bool SendInfoMessagesOnNonPCSpellLevel = false;
+        public static bool ApplyExperienceTallies;
+        public static float spellMakerCoefficientFromSettings = 4.0f;
 
         public static GetSpellLevelMethod GetSpellLevel = GetSpellLevel1;
+        public static int spellOfferInstructionCostPerHour_NonMembers = 1000;      // for non-members 
+        public static int spellOfferInstructionCostPerHour_Rank0Members = 500;
+        public static int spellOfferInstructionCostPerHour_Rank10Members = 50;      // TODO: consider setting up arrays and defaults and putting them into save 
+        public static int spellCreationInstructionCostPerHour_Rank0Members = 1000;
+            // these could involve option (for each hour began / for each hour finished), and a value for each rank 0 up to 10
+        public static int spellCreationInstructionCostPerHour_Rank10Members = 100;
 
         public static int castCostFloor;
 
-        public static List<SpellAttributeIncidence> effectIncidences;
-        public static List<SpellAttributeIncidence> targetTypeIncidences;
-        public static List<SpellAttributeIncidence> elementIncidences;
+        public static MTSpellMakerWindow activeSpellMakerWindow = null;
 
-
-        public struct SpellAttributeIncidence
-        {
-            public string Key;
-            public int Incidence;
-
-            public SpellAttributeIncidence(string key, int incidence = 0)
-            {
-                Key = key;
-                Incidence = incidence;
-            }
-        }
-
-        public static double[] IncidenceCoefficients = {4.0, 2.0, 1.41, 1}; 
-
-        public struct SpellAttributeIncidenceCoefficients
-        {
-            public double TargetTypeCoefficient;
-            public double ElementCoefficient;
-            public double EffectCoefficient;
-
-            public SpellAttributeIncidenceCoefficients(double targetTypeCoefficient=0.0, double elementCoefficient=0.0, double effectCoefficient = 0.0)
-            {
-                TargetTypeCoefficient = targetTypeCoefficient;
-                ElementCoefficient = effectCoefficient;
-                EffectCoefficient = effectCoefficient;
-            }
-        }
-
+        #region Debug Methods
 
         static void Message(string message)
         {
@@ -76,6 +55,12 @@ namespace MTMMM
         {
             MTMostlyMagicMod.SilentMessage(messagePrefix + message);
         }
+
+        public static void SilentMessage(string message, params object[] args)
+        {
+            MTMostlyMagicMod.SilentMessage(messagePrefix + message, args);
+        }
+        #endregion
 
         /// <summary>
         /// Calculate the Chance of Success of an effect using the active Spell Level Calculation method. 
@@ -100,10 +85,10 @@ namespace MTMMM
         public static int GetSpellMagnitude (BaseEntityEffect effect, EntityEffectManager manager)
         {
             if (effect.Caster == null)
-                Debug.LogWarningFormat("GetMagnitude() for {0} has no caster. Using caster level 1 for magnitude.", effect.Properties.Key);
+                UnityEngine.Debug.LogWarningFormat("GetMagnitude() for {0} has no caster. Using caster level 1 for magnitude.", effect.Properties.Key);
 
             if (manager == null)
-                Debug.LogWarningFormat("GetMagnitude() for {0} has no parent manager.", effect.Properties.Key);
+                UnityEngine.Debug.LogWarningFormat("GetMagnitude() for {0} has no parent manager.", effect.Properties.Key);
 
             int magnitude = 0;
             string messagePart = "";
@@ -218,6 +203,7 @@ namespace MTMMM
         /// </returns>
         public static int GetSpellLevelForGame(DaggerfallEntity casterDummy, IEntityEffect effect)
         {
+            //MMMAutomatons.SpellCastAutomaton_PlayerSpellLevelBeingCalculated();
             return GetSpellLevel (effect);
         }
 
@@ -251,13 +237,26 @@ namespace MTMMM
                     int skillLevel = caster.Entity.Level;       // base case, overriden every time the effect in question has a valid Magic Skill associated with it 
 
                     if (effect.Properties.MagicSkill == DFCareer.MagicSkills.None)
-                        SilentMessage("Level being calculated for Player-cast spell effect with key '" + effect.Properties.Key + "', associated Magic Skill: '" + effect.Properties.MagicSkill+"'");
-                            // this is to adapt to a change in DFU core - it seems that in dungeons (at least in Privateer's Hold) the game seeks to determine the level for a PC-cast effect with key Passive-Specials;
-                            // for this Passive-Specials effect, effect.Properties.MagicSkill is equal to DFCareer.MagicSkills.None, in which case GetLiveSkillValue would throw an array index out of bounds exception
-                            // TODO: if all goes well, consider removing this debug line
+                        SilentMessage("Level being calculated for Player-cast spell effect with key '" + effect.Properties.Key + "', associated Magic Skill: '" + effect.Properties.MagicSkill + "'");
+                    // this is to adapt to a change in DFU core - it seems that in dungeons (at least in Privateer's Hold) the game seeks to determine the level for a PC-cast effect with key Passive-Specials;
+                    // for this Passive-Specials effect, effect.Properties.MagicSkill is equal to DFCareer.MagicSkills.None, in which case GetLiveSkillValue would throw an array index out of bounds exception
+                    // TODO: if all goes well, consider removing this debug line
                     else
-                        skillLevel = (playerEntity.Skills.GetLiveSkillValue((DFCareer.Skills)effect.Properties.MagicSkill) - 9) / 3;          // (Skill-9)/3
-                    
+                    {
+                        int baseSkill = playerEntity.Skills.GetLiveSkillValue((DFCareer.Skills)effect.Properties.MagicSkill);
+
+                        if (ApplyExperienceTallies)
+                        {
+                            EffectBundleSettings guessedSpell = GuessWhichSpellWeAreCasting();
+                            float coeff = CalculateCombinedXPTalliesCoefficient(effect.Properties.Key, guessedSpell.TargetType, guessedSpell.ElementType);
+                            int skillAfterCoeff = (int)Math.Floor((float)baseSkill * coeff);
+
+                            skillLevel = (skillAfterCoeff - 9) / 3;          // (Effective Skill - 9 ) / 3
+                        }
+                        else
+                            skillLevel = (baseSkill - 9) / 3;               // (Skill-9)/3
+                    }
+
                     int willpowerLevel = 10 + (playerEntity.Stats.LiveWillpower / 5);      // 10 + Willpower/5
 
                     int luckPointsToDistribute = (playerEntity.Stats.LiveLuck - 50) / 10; // (Luck - 50) / 10 
@@ -289,21 +288,74 @@ namespace MTMMM
             }        
 
             return casterLevel;
-        }      
+        }
+
+        /// <summary>
+        /// This is safe to call even if we are not enforcing XP Tallies, but there is no point in doing it.
+        /// </summary>
+        /// <param name="effectKey"></param>
+        /// <param name="targetType"></param>
+        /// <param name="elementType"></param>
+        /// <returns></returns>
+        public static float CalculateCombinedXPTalliesCoefficient(string effectKey, TargetTypes targetType, ElementTypes elementType)
+        {
+            // the easiest way we can get XP Tallies not to have a meaningful effect in spell casting is to have the code return 1.0 here, so:
+            if (!ApplyExperienceTallies)
+                return 1.0f;
+            else
+            {
+                int effectCoefficient = MMMXPTallies.GetEffectCoefficient(effectKey);
+                int elementCoefficient = MMMXPTallies.GetElementCoefficient(elementType);
+                int targetTypeCoefficient = MMMXPTallies.GetTargetTypeCoefficient(MMMXPTallies.GetMMMTargetType(targetType, effectKey));
+                float combinedXPTalliesCoefficient = (float)effectCoefficient * elementCoefficient * targetTypeCoefficient;
+                return (float)combinedXPTalliesCoefficient / 1000000f;
+            }
+        }
+
+        public static int CalculateLearningTimeCostFromMinutes (int rankInGuild, int minutes, bool spellMaking = false)
+        {
+            int valueToReturn;
+            if (rankInGuild < 0)
+                valueToReturn = 250 * ((minutes + 14) / 15);
+            else
+                valueToReturn = 125 * ((minutes + 8) / 15) * ((11-rankInGuild) / 10);
+
+            if (spellMaking)
+                valueToReturn *= 2;
+
+            SilentMessage("CalculateLearningTimeCostFromMinutes({0},{1},{2})={3}", rankInGuild, minutes, spellMaking, valueToReturn);
+            return valueToReturn;
+        }
 
 
         /// <summary>
-        /// An override for Spell Casting Cost Calculation - the only two differenes there should be is that (1) the floor will not be 5, but a user-set value and (2) our effect-cost calculator will be used
+        /// The version to use in SpellBook, SpellMaker etc - where we know it is the player entity that is involved
+        /// If XP tallies are not enforced, passes arguments to routine from core game
         /// </summary>
-        public static FormulaHelper.SpellCost CalculateTotalEffectCosts(EffectEntry[] effectEntries, TargetTypes targetType, DaggerfallEntity casterEntity = null, bool minimumCastingCost = false)
+        /// <param name="effectEntries"></param>
+        /// <param name="targetType"></param>
+        /// <param name="casterEntity"></param>
+        /// <param name="minimumCastingCost"></param>
+        /// <returns></returns>
+        public static FormulaHelper.SpellCost CalculateTotalEffectCosts_XP(EffectEntry[] effectEntries, TargetTypes targetType, ElementTypes elementType, DaggerfallEntity casterEntity = null, bool minimumCastingCost = false)
         {
+            if (!ApplyExperienceTallies)
+            {
+                return CalculateTotalEffectCosts(effectEntries, targetType, casterEntity, minimumCastingCost);
+            }
+
+            if (elementType == ElementTypes.None)
+            {
+                SilentMessage("StackTrace:" + Environment.StackTrace);
+            }
             FormulaHelper.SpellCost totalCost;
             totalCost.goldCost = 0;
             totalCost.spellPointCost = 0;
+            int PlayerIntelligence = GameManager.Instance.PlayerEntity.Stats.GetLiveStatValue(DFCareer.Stats.Intelligence);
 
             // Must have effect entries
             if (effectEntries == null || effectEntries.Length == 0)
-                return totalCost;
+                return totalCost;            
 
             // Add costs for each active effect slot
             for (int i = 0; i < effectEntries.Length; i++)
@@ -311,10 +363,18 @@ namespace MTMMM
                 if (string.IsNullOrEmpty(effectEntries[i].Key))
                     continue;
 
-                FormulaHelper.SpellCost partialCost = FormulaHelper.CalculateEffectCosts(effectEntries[i], casterEntity);                 
+                IEntityEffect effectTemplate = GameManager.Instance.EntityEffectBroker.GetEffectTemplate(effectEntries[i].Key);
+
+                if (effectTemplate == null)
+                    continue;
+
+                DFCareer.Skills magicSkill = (DFCareer.Skills)effectTemplate.Properties.MagicSkill;
+
+                FormulaHelper.SpellCost partialCost = CalculateEffectCosts_XP(GameManager.Instance.EntityEffectBroker.GetEffectTemplate(effectEntries[i].Key),
+                    effectEntries[i].Settings, targetType, elementType, casterEntity);
                 totalCost.goldCost += partialCost.goldCost;
                 totalCost.spellPointCost += partialCost.spellPointCost;
-            }
+            }           
 
             // Multipliers for target type
             totalCost.goldCost = FormulaHelper.ApplyTargetCostMultiplier(totalCost.goldCost, targetType);
@@ -323,6 +383,7 @@ namespace MTMMM
             // Set vampire spell cost
             if (minimumCastingCost)
                 totalCost.spellPointCost = castCostFloor;
+            
 
             // Enforce minimum
             if (totalCost.spellPointCost < castCostFloor)
@@ -331,24 +392,122 @@ namespace MTMMM
             return totalCost;
         }
 
-        static int trunc(double value) { return (int)Math.Truncate(value); }
-
-        static int GetEffectComponentCosts(
-            EffectCosts costs,
-            int starting,
-            int increase,
-            int perLevel,
-            int skillValue)
+        /// <summary>
+        /// The version to use for SpellBook, SpellMaker etc where we know it is the player who is involved.
+        /// If XP Tallies are not enforced, passes arguments to routine from core game
+        /// </summary>
+        public static FormulaHelper.SpellCost CalculateEffectCosts_XP(IEntityEffect effect, EffectSettings settings, TargetTypes targetType, ElementTypes elementType,
+            DaggerfallEntity casterEntity = null)
         {
-            //Calculate effect gold cost, spellpoint cost is calculated from gold cost after adding up for duration, chance and magnitude
-            return trunc(costs.OffsetGold + costs.CostA * starting + costs.CostB * trunc(increase / perLevel));
+            if (!ApplyExperienceTallies)
+                return OriginalCalculateEffectCosts(effect, settings, casterEntity);
+                    // if XP Tallies are not enforced, fall back to original routines
+            
+            bool activeComponents = false;
+
+            if (elementType == ElementTypes.None)
+            {
+                SilentMessage("StackTrace:" + Environment.StackTrace);
+            }
+
+            // Get related skill
+            int skillValue = 0;
+            if (casterEntity == null)
+            {
+                // From player
+                int basicSkillValue = GameManager.Instance.PlayerEntity.Skills.GetLiveSkillValue((DFCareer.Skills)effect.Properties.MagicSkill);
+                float coeff = CalculateCombinedXPTalliesCoefficient(effect.Properties.Key, targetType, elementType);
+                            // CalculateEffectCosts_XP should not be called if Skill Tallies are not enforced
+                skillValue = (int)Math.Floor((float)basicSkillValue * coeff);
+                if (MTSpellBookWindow.logSkillCalculationsDuringWindowInit)
+                    SilentMessage(string.Format("CalculateEffectCosts for Player: {0} effect, {1} TargetType, {2} element: basicskill={3}, coefficient={4}, resultingskill={5}",
+                        effect.Key, targetType, elementType, basicSkillValue, coeff, skillValue));                   
+
+            }
+            else
+            {
+                // From another entity
+                skillValue = casterEntity.Skills.GetLiveSkillValue((DFCareer.Skills)effect.Properties.MagicSkill);
+            }
+
+            // Duration costs
+            int durationGoldCost = 0;
+            if (effect.Properties.SupportDuration)
+            {
+                activeComponents = true;
+                durationGoldCost = GetEffectComponentCosts(
+                    effect.Properties.DurationCosts,
+                    settings.DurationBase,
+                    settings.DurationPlus,
+                    settings.DurationPerLevel,
+                    skillValue);
+
+                //Debug.LogFormat("Duration: gold {0} spellpoints {1}", durationGoldCost, durationSpellPointCost);
+            }
+
+            // Chance costs
+            int chanceGoldCost = 0;
+            if (effect.Properties.SupportChance)
+            {
+                activeComponents = true;
+                chanceGoldCost = GetEffectComponentCosts(
+                    effect.Properties.ChanceCosts,
+                    settings.ChanceBase,
+                    settings.ChancePlus,
+                    settings.ChancePerLevel,
+                    skillValue);
+
+                //Debug.LogFormat("Chance: gold {0} spellpoints {1}", chanceGoldCost, chanceSpellPointCost);
+            }
+
+            // Magnitude costs
+            int magnitudeGoldCost = 0;
+            if (effect.Properties.SupportMagnitude)
+            {
+                activeComponents = true;
+                int magnitudeBase = (settings.MagnitudeBaseMax + settings.MagnitudeBaseMin) / 2;
+                int magnitudePlus = (settings.MagnitudePlusMax + settings.MagnitudePlusMin) / 2;
+                magnitudeGoldCost = GetEffectComponentCosts(
+                    effect.Properties.MagnitudeCosts,
+                    magnitudeBase,
+                    magnitudePlus,
+                    settings.MagnitudePerLevel,
+                    skillValue);
+
+                //Debug.LogFormat("Magnitude: gold {0} spellpoints {1}", magnitudeGoldCost, magnitudeSpellPointCost);
+            }
+
+            // If there are no active components (e.g. Teleport) then fudge some costs
+            // This gives the same casting cost outcome as classic and supplies a reasonable gold cost
+            // Note: Classic does not assign a gold cost when a zero-component effect is the only effect present, which seems like a bug
+            int fudgeGoldCost = 0;
+            if (!activeComponents)
+                fudgeGoldCost = GetEffectComponentCosts(BaseEntityEffect.MakeEffectCosts(60, 100, 160), 1, 1, 1, skillValue);
+                        // TODO: optional Legacy Advanced Teleportation cost increase could be enforced here
+
+            // Add gold costs together and calculate spellpoint cost from the result
+            FormulaHelper.SpellCost effectCost;
+            effectCost.goldCost = durationGoldCost + chanceGoldCost + magnitudeGoldCost + fudgeGoldCost;
+
+            int effectiveSkillValue = 0;
+
+            if (skillValue <= 95) effectiveSkillValue = skillValue;                     // if up to 95, no change
+            if (skillValue > 95) effectiveSkillValue = 95 + ((skillValue - 95) / 3);      // if over 95, spell effect costs should not go down as rapidly,
+            if (effectiveSkillValue > 109) effectiveSkillValue = 109;                   //  instead, skill=137 and over should give a (110 - effectiveSkillValue) = 1
+
+            // SilentMessage("Effective Skill Value (effect key="+ effect.Key+") calculated = " + effectiveSkillValue); // turning off FOR ANOTHER TEST
+
+            effectCost.spellPointCost = effectCost.goldCost * (110 - effectiveSkillValue) / 400;
+
+            //Debug.LogFormat("Costs: gold {0} spellpoints {1}", finalGoldCost, finalSpellPointCost);
+            return effectCost;
         }
 
         /// <summary>
-        /// Calculates effect costs from an IEntityEffect and custom settings.
+        /// The original routine from FormulaHelper
         /// </summary>
-        public static FormulaHelper.SpellCost CalculateEffectCosts(IEntityEffect effect, EffectSettings settings, DaggerfallEntity casterEntity = null)
-        {         
+        public static FormulaHelper.SpellCost OriginalCalculateEffectCosts(IEntityEffect effect, EffectSettings settings, DaggerfallEntity casterEntity = null)
+        {       
             bool activeComponents = false;
 
             // Get related skill
@@ -421,19 +580,125 @@ namespace MTMMM
             // Add gold costs together and calculate spellpoint cost from the result
             FormulaHelper.SpellCost effectCost;
             effectCost.goldCost = durationGoldCost + chanceGoldCost + magnitudeGoldCost + fudgeGoldCost;
-
-            int effectiveSkillValue=0;
-
-            if (skillValue <= 95) effectiveSkillValue = skillValue;                     // if up to 95, no change
-            if (skillValue > 95) effectiveSkillValue = 95 + ((skillValue - 95) / 3);      // if over 95, spell effect costs should not go down as rapidly,
-            if (effectiveSkillValue > 109) effectiveSkillValue = 109;                   //  instead, skill=137 and over should give a (110 - effectiveSkillValue) = 1
-                                                                                                    
-            SilentMessage("Effective Skill Value (effect key="+ effect.Key+") calculated = " + effectiveSkillValue);
-
-            effectCost.spellPointCost = effectCost.goldCost * (110 - effectiveSkillValue) / 400;
+            effectCost.spellPointCost = effectCost.goldCost * (110 - skillValue) / 400;
 
             //Debug.LogFormat("Costs: gold {0} spellpoints {1}", finalGoldCost, finalSpellPointCost);
             return effectCost;
+        }
+
+        /// <summary>
+        /// An override for Spell Casting Cost Calculation - the only two differenes there should be is that (1) the floor will not be 5, but a user-set value and (2) our effect-cost calculator will be used
+        /// </summary>
+        public static FormulaHelper.SpellCost CalculateTotalEffectCosts(EffectEntry[] effectEntries, TargetTypes targetType, DaggerfallEntity casterEntity = null, bool minimumCastingCost = false)
+        {
+            FormulaHelper.SpellCost totalCost;
+            totalCost.goldCost = 0;
+            totalCost.spellPointCost = 0;
+            int PlayerIntelligence = GameManager.Instance.PlayerEntity.Stats.GetLiveStatValue(DFCareer.Stats.Intelligence);
+
+            // Must have effect entries
+            if (effectEntries == null || effectEntries.Length == 0)
+                return totalCost;            
+
+            // Add costs for each active effect slot
+            for (int i = 0; i < effectEntries.Length; i++)
+            {
+                if (string.IsNullOrEmpty(effectEntries[i].Key))
+                    continue;
+
+                IEntityEffect effectTemplate = GameManager.Instance.EntityEffectBroker.GetEffectTemplate(effectEntries[i].Key);
+
+                if (effectTemplate == null)
+                    continue;
+
+                DFCareer.Skills magicSkill = (DFCareer.Skills) effectTemplate.Properties.MagicSkill;
+
+                FormulaHelper.SpellCost partialCost = FormulaHelper.CalculateEffectCosts(effectEntries[i], casterEntity);                 
+                totalCost.goldCost += partialCost.goldCost;
+                totalCost.spellPointCost += partialCost.spellPointCost;               
+
+            }           
+
+            // Multipliers for target type
+            totalCost.goldCost = FormulaHelper.ApplyTargetCostMultiplier(totalCost.goldCost, targetType);
+            totalCost.spellPointCost = FormulaHelper.ApplyTargetCostMultiplier(totalCost.spellPointCost, targetType);
+
+            // Set vampire spell cost
+            if (minimumCastingCost)
+                totalCost.spellPointCost = castCostFloor;            
+
+            // Enforce minimum
+            if (totalCost.spellPointCost < castCostFloor)
+                totalCost.spellPointCost = castCostFloor;            
+
+            return totalCost;
+        }
+
+        static int trunc(double value) { return (int)Math.Truncate(value); }
+
+        static int GetEffectComponentCosts(
+            EffectCosts costs,
+            int starting,
+            int increase,
+            int perLevel,
+            int skillValue)
+        {
+            //Calculate effect gold cost, spellpoint cost is calculated from gold cost after adding up for duration, chance and magnitude
+            return trunc(costs.OffsetGold + costs.CostA * starting + costs.CostB * trunc(increase / perLevel));
+        }
+
+        /// <summary>
+        /// Should not be called if we are not enforcing XP Tallies
+        /// </summary>
+        /// <returns></returns>
+        public static EffectBundleSettings GuessWhichSpellWeAreCasting()
+        {
+            SilentMessage("Trying to guess which spell is concerned.");
+
+            if (activeSpellMakerWindow!=null)
+            {
+                EffectBundleSettings bundleToReturn = activeSpellMakerWindow.ActualStateOfTheSpellCreated();
+                string message = "Since activeSpellMakerWindow is true, we will go with the spell from the active MTSpellMakerWindow that has the following effects: ";
+                for (int i = 0; i < bundleToReturn.Effects.Length; i++)
+                    message += " "+bundleToReturn.Effects[i].Key;
+                SilentMessage(message);
+                return bundleToReturn;
+            }
+
+            if (MTSpellBookWindow.spellInTheProcess)
+            {
+                SilentMessage("Since MTSpellBookWindow.spellInTheProcess is true, we are apparently in the process of starting a spellcast via SpellBookWindow. Spell is: "
+                    + MTSpellBookWindow.chosenSpell.Name);
+                return MTSpellBookWindow.chosenSpell;
+            }
+
+            if (GameManager.Instance.PlayerEffectManager.ReadySpell != null)
+            {
+                SilentMessage("Since GameManager.Instance.PlayerEffectManager.ReadySpell is not null, it appears we are in the process of casting a spell. Returning ReadySpell: " + GameManager.Instance.PlayerEffectManager.ReadySpell.Settings.Name);
+                return GameManager.Instance.PlayerEffectManager.ReadySpell.Settings;
+            }
+
+            SilentMessage("Our last guess is that we are in the process of casting a spell, but ReadySpell is already null for some reason. Trying LastSpell: "
+                + GameManager.Instance.PlayerEffectManager.LastSpell.Settings.Name);
+            return GameManager.Instance.PlayerEffectManager.LastSpell.Settings;     // NOTE: if this guess is bad, the game might hang
+        }
+
+        /// <summary>
+        /// Calculates effect costs from an IEntityEffect and custom settings.
+        /// </summary>
+        public static FormulaHelper.SpellCost CalculateEffectCosts(IEntityEffect effect, EffectSettings settings, DaggerfallEntity casterEntity = null)
+        {
+            if (ApplyExperienceTallies)
+            {
+                //SilentMessage("CalculateEffectCosts called.");
+                EffectBundleSettings guessedSpell = GuessWhichSpellWeAreCasting();
+                TargetTypes targetType = guessedSpell.TargetType;
+                ElementTypes elementType = guessedSpell.ElementType;       // a thought: maybe screen here for player-cast spells and pass on to XP only those where caster=player            
+
+                return CalculateEffectCosts_XP(effect, settings, targetType, elementType, casterEntity);
+            }
+            else
+                return OriginalCalculateEffectCosts(effect, settings, casterEntity);    // if there are no tallies being enforced, we should use the original routine
         }
 
         /// <summary>
@@ -449,142 +714,18 @@ namespace MTMMM
                 maxHealth += ourNumberGenerator.Next(1, hitPointsPerLevel + 1);
             }
             return maxHealth;
-        }
-
-        
-
-        public static void IncreaseIncidenceFor (string key, List<SpellAttributeIncidence> listToUpdate)
-        {
-            for (int i = 0; i < listToUpdate.Count; i++)
-                if (listToUpdate[i].Key == key)
-                {
-                    SpellAttributeIncidence incidenceToBeModified = listToUpdate[i];
-                    incidenceToBeModified.Incidence++;
-                    listToUpdate[i] = incidenceToBeModified;
-                    return;
-                }
-
-            listToUpdate.Add(new SpellAttributeIncidence(key, 1));
-        }        
-
-        public static void IncreaseEffectIncidenceFor (string key)
-        {
-            IncreaseIncidenceFor(key, effectIncidences);
-        }
-
-        public static void IncreaseTargetTypeIncidenceFor (TargetTypes targetType)
-        {
-            string key = ((int)targetType).ToString();
-            IncreaseIncidenceFor(key, targetTypeIncidences);
-        }
-
-        public static void IncreaseElementIncidenceFor(ElementTypes elementType)
-        {
-            string key = ((int)elementType).ToString();
-            IncreaseIncidenceFor(key, elementIncidences);
-        }
-
-        public static void CalculatePlayerSpellCharacteristicIncidences()
-        {
-            SilentMessage("CalculatePlayerSpellCharacteristicIncidences called");
-            effectIncidences = new List<SpellAttributeIncidence>();
-            targetTypeIncidences = new List<SpellAttributeIncidence>();
-            elementIncidences = new List<SpellAttributeIncidence>();        // reseting work lists
-
-            EffectBundleSettings[] playerSpells = GameManager.Instance.PlayerEntity.GetSpells();
-
-            for (int i = 0; i < playerSpells.Length; i++)
-            {
-                IncreaseTargetTypeIncidenceFor(playerSpells[i].TargetType);
-                IncreaseElementIncidenceFor(playerSpells[i].ElementType);
-
-                EffectEntry[] spellEffects = playerSpells[i].Effects;
-                for (int j = 0; j < spellEffects.Length; j++)
-                    IncreaseEffectIncidenceFor(spellEffects[j].Key);
-            }
-        }
-
-        public static string GetSpellAttributeIncidenceTableString(List<SpellAttributeIncidence> listToPrint)
-        {
-            string tempString = "";
-            for (int i = 0; i < listToPrint.Count; i++)
-                tempString += "'" + listToPrint[i].Key + "'=" + listToPrint[i].Incidence + "  ";
-            return tempString;
-        }
-
-        public static string ReturnSpellAttributeIncidencesString(bool recalculateBeforePrinting = true)
-        {
-            SilentMessage("PrintSpellAttributeIncidencesToPlayer called");
-            if (recalculateBeforePrinting) CalculatePlayerSpellCharacteristicIncidences();
-
-            string incidenceString = "Printing Player SpellBook Incidences." + Environment.NewLine +
-                "\t\tEFFECTS. " + GetSpellAttributeIncidenceTableString(effectIncidences) + Environment.NewLine +
-                "\t\tTARGET-TYPES. " + GetSpellAttributeIncidenceTableString(targetTypeIncidences) + Environment.NewLine +
-                "\t\tELEMENTS. " + GetSpellAttributeIncidenceTableString(elementIncidences);
-
-            return incidenceString;
-        }
-
-        public static int GetIncidenceFor(string key, List<SpellAttributeIncidence> listToCheck)
-        {
-            for (int i = 0; i < listToCheck.Count; i++)
-                if (listToCheck[i].Key == key)
-                {
-                    // SilentMessage("Key '" + key + "' found in table. Incidence returned: " + listToCheck[i].Incidence);
-                    return listToCheck[i].Incidence;
-                }
-            // SilentMessage("Key not found in table, returning 0.");
-            return 0;
-        }
-
-        public static int GetEffectIncidenceFor(string key)
-        {
-            // SilentMessage("GetEffectIncidenceFor called, key=" + key);
-            return GetIncidenceFor(key, effectIncidences);
-        }
-
-        public static int GetTargetTypeIncidenceFor(TargetTypes targetType)
-        {
-            string key = ((int)targetType).ToString();
-            // SilentMessage("GetTargetTypeIncidenceFor called, key=" + key);
-            return GetIncidenceFor(key, targetTypeIncidences);
-        }
-
-        public static int GetElementIncidenceFor(ElementTypes elementType)
-        {
-            string key = ((int)elementType).ToString();
-            // SilentMessage("GetElementIncidenceFor called, key=" + key);
-            return GetIncidenceFor(key, elementIncidences);
-        }
-
-        public static SpellAttributeIncidenceCoefficients CalculateSpellAttributeIncidenceCoefficients(EffectBundleSettings spell)
-        {
-            // SilentMessage("CalculateSpellAttributeIncidenceCoefficients called.");
-            string calculationDetailsString = "";
-            CalculatePlayerSpellCharacteristicIncidences();
-            SilentMessage(ReturnSpellAttributeIncidencesString(false));     // no need to do recalculation again, explicitly done via previous line
-
-            SpellAttributeIncidenceCoefficients coefficientsToReturn = new SpellAttributeIncidenceCoefficients();
-
-            coefficientsToReturn.TargetTypeCoefficient = IncidenceCoefficients[Math.Min(GetTargetTypeIncidenceFor(spell.TargetType), 3)];            
-            coefficientsToReturn.ElementCoefficient = IncidenceCoefficients[Math.Min(GetElementIncidenceFor(spell.ElementType), 3)];
-            coefficientsToReturn.EffectCoefficient = IncidenceCoefficients[3];
-
-            for (int i = 0; i < spell.Effects.Length; i++)
-                coefficientsToReturn.EffectCoefficient = Math.Max(coefficientsToReturn.EffectCoefficient, IncidenceCoefficients[Math.Min(GetEffectIncidenceFor(spell.Effects[i].Key), 3)]);
-                
-            return coefficientsToReturn;       
-        }
+        }       
 
         public static int CalculateSpellCreationTimeCost(EffectBundleSettings spell, bool spellMaker=false)
         {
 
             SilentMessage("CalculateSpellCreationTimeCost called with spellMaker=" + spellMaker);
-            FormulaHelper.SpellCost tmpSpellCost = FormulaHelper.CalculateTotalEffectCosts(spell.Effects, spell.TargetType, null, spell.MinimumCastingCost);
-            double magickaCost = tmpSpellCost.spellPointCost;             
-            double spellMakerCoefficient = 1.0;
+            FormulaHelper.SpellCost tmpSpellCost = MMMFormulaHelper.CalculateTotalEffectCosts_XP(spell.Effects, spell.TargetType, spell.ElementType);
+            double magickaCost = tmpSpellCost.spellPointCost;
+            
+            float spellMakerCoefficient = 1.0f;
             if (spellMaker)
-                spellMakerCoefficient = 4.0;
+                spellMakerCoefficient = spellMakerCoefficientFromSettings;      
 
             SilentMessage("magickaCost for the spell calculated: " + magickaCost+ ", spellMakerCoefficient: "+spellMakerCoefficient);
 
@@ -594,34 +735,14 @@ namespace MTMMM
             // the above serves only as hints as to how I designed the function - the number have been tweaked since then
 
             int ourLiveIntelligence = GameManager.Instance.PlayerEntity.Stats.LiveIntelligence;
-            double intelligenceRatio = magickaCost / (double)ourLiveIntelligence;
-            SpellAttributeIncidenceCoefficients spellAttributeIncidenceCoefficients = CalculateSpellAttributeIncidenceCoefficients(spell);
-            SilentMessage("intelligence: "+ourLiveIntelligence+" intelligenceRatio: " + intelligenceRatio + ", incidencecoefficients [eff,elem,targ]: [" +
-                spellAttributeIncidenceCoefficients.EffectCoefficient+", "+spellAttributeIncidenceCoefficients.ElementCoefficient+", "+
-                spellAttributeIncidenceCoefficients.TargetTypeCoefficient+"]");
+            double intelligenceRatio = magickaCost / (double)ourLiveIntelligence;                 
 
-            int spellLearningTimeCost = Math.Max(trunc(600 /4 /2 * intelligenceRatio * intelligenceRatio * spellAttributeIncidenceCoefficients.EffectCoefficient *
-                spellAttributeIncidenceCoefficients.ElementCoefficient * spellAttributeIncidenceCoefficients.TargetTypeCoefficient * spellMakerCoefficient), 12); 
+            int spellLearningTimeCost = trunc(Math.Max(600 * intelligenceRatio * intelligenceRatio, 12)*spellMakerCoefficient);            
 
             SilentMessage("LiveINT=" + ourLiveIntelligence + ", magickaCost=" + magickaCost +
                 ", IntelligenceRatio=" + intelligenceRatio + ", TimeCost=" + spellLearningTimeCost);
             return spellLearningTimeCost;
-        }
-
+        }        
         
-        /*          Previous version - keeping for reference purposes
-        /// <summary>
-        /// Calculates the time it takes for PC to learn a spell with the given magicka cost, in minutes
-        /// </summary>
-        public static int CalculateSpellLearningTimeCost(double magickaCost)
-        {
-            
-            int ourLiveIntelligence = GameManager.Instance.PlayerEntity.Stats.LiveIntelligence;
-            double intelligenceRatio = magickaCost / (double)ourLiveIntelligence;
-            int spellLearningTimeCost = Math.Max(trunc(600 * intelligenceRatio * intelligenceRatio), 24);        // establish a minimum of 24 minutes
-            SilentMessage("CalculateSpellLearningTimeCost: LiveINT=" + ourLiveIntelligence+", magickaCost="+magickaCost+
-                ", IntelligenceRatio="+intelligenceRatio+", TimeCost="+spellLearningTimeCost);
-            return spellLearningTimeCost;
-        }  */
     }
 }

@@ -24,6 +24,7 @@ using DaggerfallWorkshop;
 using DaggerfallWorkshop.Game;
 using DaggerfallWorkshop.Game.Entity;
 using DaggerfallWorkshop.Game.Formulas;
+using DaggerfallWorkshop.Game.Guilds;
 using DaggerfallWorkshop.Game.Items;
 using DaggerfallWorkshop.Game.MagicAndEffects;
 using DaggerfallWorkshop.Game.UserInterface;
@@ -38,6 +39,99 @@ namespace MTMMM
     public class MTSpellMakerWindow : DaggerfallSpellMakerWindow
     {
         static string messagePrefix = "MTSpellMakerWindow: ";
+        public static float baseGuildFeeMultiplier = 4.0f;
+        public static float spellCreationTimeCoefficient = 4.0f;
+        bool calculationDebugToPlayerBefore;
+
+        uint factionID;
+        int playerRankInGuild;
+
+        public static string[] NeedToFindOtherTeacherMessage = new string[] {             // the guild hall in not qualified to teach the relevant effect
+            "Unfortunately, I cannot help you with this task.",
+            "You should seek the help of someone who has studied ",
+            "this field of magic extensively.",
+            "Such a person would be able to help you."};
+        // No parameter needed
+
+        public static string[] WouldTakeTooMuchTimeMessage = new string[] {             // would take more than 10 hours to teach spell
+            "It would take me too long to teach this spell to you.",
+            "It could help if you developed your intelligence, gained some ",
+            "experience in the school of magic or with similar spells.",
+            "Or, you could try some other way to master the spell."    };
+        // No parameter needed
+
+        public static string[] NotEnoughGoldForBareEssentialsMessage = new string[] {       // the player cannot affor the bare essentials, so is dismissed
+            "I am afraid you don't have enough gold to cover the guild fee of {0} ",
+            "and the instruction fee of {1}."    };     // guild fee, instruction fee}
+
+
+        public static string[] OnlyBareEssentialsMessage = new string[] {       // when the player can only afford the bare essentials, so no further choice needs to be given
+                                                                                        // or, when already made the choice to decline refreshments
+            "Teaching this spell to you will take some time ({1} minutes, ",
+            "{3} fatigue points) and {4} magicka points.",
+            "Our institution charges {0} gold pieces for the spell.",
+            "You will also pay a personal fee of {2} gold pieces for my time.",
+            "",
+            "Shall we begin now?"
+            };           // what needs to be passed: (0) guild fee, (1) time cost, (2) instruction cost, (3) fatigue cost, (4) spell point cost
+
+        public static string[] TooTiredAndNotEnoughGoldForPotionsMessage = new string[] { // the player can afford the bare essentials, but is too tired and can't afford the refreshment potions
+            "The guild fee will be {0} gold pieces and you will also",
+            "pay a personal fee of {2} gold pieces for my time.",
+            "",
+            "Teaching this spell to you would take some time ({1} minutes, ",
+            "{3} fatigue points) and {4} magicka points.",
+            "",
+            "You are too tired at the moment. I would offer refreshments ",
+            "but you cannot afford them, so I am afraid you will need to ",
+            "come back later."
+            };      // what needs to be passed: (0) guild fee, (1) time cost, (2) instruction cost, (3) fatigue cost, (4) spell point cost
+
+        public static string[] HasToTakeRefreshmentsMessage = new string[] {       // when player is tired, needs refreshments, CAN affort these, but no choice needs to be given
+            "Teaching this spell to you will take some time ({1} minutes, ",
+            "{3} fatigue points) and {4} magicka points.",
+            "",
+            "Our institution charges {0} gold pieces for the spell.",
+            "You will also pay a personal fee of {2} gold pieces for my time.",
+            "",
+            "I can see that you are quite tired. I will also offer a restoration ",
+            "of your expended fatigue for {5} gold pieces and magicka for",
+            "{6} gold pieces.",
+            "",
+            "Altogether that will be {7} gold pieces and {1} minutes of time.",
+            "",
+            "Shall we begin now?"
+            };          // what needs to be passed: (0) guild fee, (1) time cost, (2) instruction cost, (3) fatigue cost, (4) spell point cost, (5) actual fatigue potion cost,
+                        // (6) actual spellpoint potion cost, (7) total gold cost including refreshments
+
+        public static string[] HasChoiceAboutBuyingRefreshmentsMessage = new string[] { // the player has enough fatigue+magicka, but also enough gold for refreshments
+            "The guild fee will be {0} gold pieces and you will also",
+            "pay a personal fee of {2} gold pieces for my time.",
+            "",
+            "Teaching this spell to you would take some time ({1} minutes, ",
+            "{3} fatigue points) and {4} magicka points.",
+            "",
+            "In addition, I can offer you to restore your expended fatigue ",
+            "for {5} gold pieces and magicka for {6} gold pieces.",
+            "",
+            "Would you like to have this fatigue and magicka restored?"
+            };      // what needs to be passed: (0) guild fee, (1) time cost, (2) instruction cost, (3) fatigue cost, (4) spell point cost
+                    // (5) actual fatigue potion cost, (6) actual spellpoint potion cost
+
+        public static string[] HasAcceptedTakingRefreshmentsMessage = new string[]    // the player has made the choice to take the refreshments
+        {
+            "Including the refreshments, as discussed, teaching this ",
+            "spell to you will take {1} minutes and involve a total",
+            "expense of {0} gold pieces.",
+            "",
+            "Shall we begin now?"
+        };          // (0) total gold cost including refreshments, (1) time cost
+
+
+
+
+
+
         public string[] onSpellMake1 = {
             "An interesting choice. Of course, there will be some costs involved.",
             "First, the guild fee will be {0} gold pieces.",    // index=1
@@ -48,6 +142,9 @@ namespace MTMMM
             "To sum it up, the new spell will cost you {0} gold pieces, {1} minutes, {2} spell points and {3} fatigue points.", // index=6
             " ",
             "Shall we begin now?" };
+
+        public List<string> knowableEffectGroups;
+        public Dictionary<string, string[]> knowableEffects;
 
         #region UI Rects
 
@@ -159,6 +256,8 @@ namespace MTMMM
 
         protected const SoundClips inscribeGrimoire = SoundClips.ParchmentScratching;
 
+        protected PlayerGPS.DiscoveredBuilding buildingDiscoveryData;
+
         List<IEntityEffect> enumeratedEffectTemplates = new List<IEntityEffect>();
 
         EffectEntry[] effectEntries = new EffectEntry[maxEffectsPerSpell];
@@ -172,9 +271,26 @@ namespace MTMMM
         protected SpellIcon selectedIcon;
 
         int totalGoldCost = 0;
-        int totalSpellPointCost = 0;
+        int totalSpellPointCost = 0;       
+
+        int actualSpellPointCost;
+
+        // here come the parameters of the spell that the player has chosen - for the purposes of negotiating the options and the endprice
+        int baseGuildFee = 0;       // spell-point casting cost *4
+        int actualGuildFee = 0;     // apply FormulaHelper method (Mercantile) to baseguildfee
         int actualSpellMakingTimeCost = 0;
+        int baseInstructionFee = 0;     // a function of instruction time and guild rank
+        int actualInstructionFee = 0;     // apply FormulaHelper method (Mercantile) to baseInstructionfee
         int actualSpellPointCostOfMaking = 0;
+        int baseSpellPointPotionCost = 0;   // a function of spell point cost of learning and guild rank
+        int actualSpellPointPotionCost = 0;     // apply FormulaHelper method (Mercantile) to baseSpellPointPotionCost
+        int actualFatigueCostOfMaking = 0;
+        int actualFatigueCostOfMakingToPlayer = 0;
+        int baseFatiguePotionCost = 0; // a function of fatigue cost of learning and guild rank
+        int actualFatiguePotionCost = 0;        // apply FormulaHelper method (Mercantile) to baseFatiguePotionCost
+
+        bool buyingPotionsToo;
+
 
         protected EffectEntry[] EffectEntries { get { return effectEntries; } }
         protected int TotalGoldCost { get { return totalGoldCost; } }
@@ -188,7 +304,13 @@ namespace MTMMM
         public MTSpellMakerWindow(IUserInterfaceManager uiManager, DaggerfallBaseWindow previous = null)
             : base(uiManager, previous)
         {
-            // MT TODO: print spellbook effect list into player log
+            
+        }
+
+        public override void OnPop()
+        {
+            MMMFormulaHelper.activeSpellMakerWindow = null;
+            SilentMessage("Set active spellmaker in MMMFormulaHelper to null.");
         }
 
         #endregion
@@ -204,6 +326,10 @@ namespace MTMMM
             MTMostlyMagicMod.SilentMessage(messagePrefix + message);
         }
 
+        public static void SilentMessage(string message, params object[] args)
+        {
+            MTMostlyMagicMod.SilentMessage(messagePrefix + message, args);
+        }
         #endregion
 
         #region Setup Methods
@@ -239,6 +365,20 @@ namespace MTMMM
 
         public override void OnPush()
         {
+            factionID = GameManager.Instance.PlayerEnterExit.FactionID;
+            SilentMessage("MTSpellMakerWindow being created, in object with a factionID of " + factionID);
+            IGuild ownerGuild = GameManager.Instance.GuildManager.GetGuild((int)factionID);
+            playerRankInGuild = ownerGuild.Rank;
+            SilentMessage("Guild object successfully obtained for " + factionID + ", player rank in guild: " + playerRankInGuild);
+
+            calculationDebugToPlayerBefore = MMMXPTallies.CalculationDebugToPlayer;
+            MMMXPTallies.CalculationDebugToPlayer = false;            
+
+            MMMFormulaHelper.activeSpellMakerWindow = this;
+            SilentMessage("Set self up to be the active spellmaker in MMMFormulaHelper.");
+
+            if (GameManager.Instance.PlayerEnterExit.IsPlayerInside)
+                buildingDiscoveryData = GameManager.Instance.PlayerEnterExit.BuildingDiscoveryData;
             InitEffectSlots();
 
             SetDefaults();
@@ -394,12 +534,20 @@ namespace MTMMM
             selectIconButton.BackgroundTexture = DaggerfallUI.Instance.SpellIconCollection.GetSpellIcon(selectedIcon);
         }
 
-        protected virtual void SetStatusLabels()        // TODO: can wait: later consider overriding this one
+        protected virtual void SetStatusLabels()
         {
+            int presentedCost;
             maxSpellPointsLabel.Text = GameManager.Instance.PlayerEntity.MaxMagicka.ToString();
             moneyLabel.Text = GameManager.Instance.PlayerEntity.GoldPieces.ToString();
-            goldCostLabel.Text = totalGoldCost.ToString();
-            spellPointCostLabel.Text = totalSpellPointCost.ToString();
+
+            if ((GameManager.Instance.PlayerEntity.CurrentFatigue < PlayerEntity.DefaultFatigueLoss * (actualSpellMakingTimeCost + 60)) || // should provide for fatigue to end training with 1 hours reserve left
+                        (GameManager.Instance.PlayerEntity.CurrentMagicka < actualSpellPointCostOfMaking))
+                presentedCost = actualGuildFee + actualInstructionFee + actualFatiguePotionCost + actualSpellPointPotionCost;
+            else
+                presentedCost = actualGuildFee + actualInstructionFee;
+            goldCostLabel.Text = presentedCost.ToString();
+
+            spellPointCostLabel.Text = actualSpellPointCost.ToString();
         }
 
         #endregion
@@ -497,6 +645,7 @@ namespace MTMMM
 
         protected virtual void AddAndEditSlot(IEntityEffect effectTemplate)
         {
+            SilentMessage("AddAndEditSlot called with key={0}", effectTemplate.Key);
             effectEditor.EffectTemplate = effectTemplate;
             int slot = GetFirstFreeEffectSlotIndex();
             effectEntries[slot] = effectEditor.EffectEntry;
@@ -717,6 +866,68 @@ namespace MTMMM
             return effects;
         }
 
+        protected virtual void CalculateSpellCosts()
+        {
+            List<EffectEntry> effects = GetEffectEntries();
+            spell = new EffectBundleSettings();
+            spell.Version = EntityEffectBroker.CurrentSpellVersion;
+            spell.BundleType = BundleTypes.Spell;
+            spell.TargetType = selectedTarget;
+            spell.ElementType = selectedElement;
+            spell.Name = spellNameLabel.Text;
+            spell.IconIndex = selectedIcon.index;
+            spell.Icon = selectedIcon;
+            spell.Effects = effects.ToArray();
+
+            
+            FormulaHelper.SpellCost spellCost = MMMFormulaHelper.CalculateTotalEffectCosts_XP(spell.Effects, spell.TargetType, spell.ElementType, null, spell.MinimumCastingCost);
+            actualSpellPointCost = spellCost.spellPointCost;
+            baseGuildFee = (int)Math.Round(((float)actualSpellPointCost) * baseGuildFeeMultiplier);       // spell-point casting cost *4
+            actualGuildFee = FormulaHelper.CalculateTradePrice(baseGuildFee, buildingDiscoveryData.quality, false);
+
+            actualSpellMakingTimeCost = MMMFormulaHelper.CalculateSpellCreationTimeCost(spell, true);
+
+            baseInstructionFee = MMMFormulaHelper.CalculateLearningTimeCostFromMinutes(playerRankInGuild, actualSpellMakingTimeCost, true);
+
+            /*baseInstructionFee = 1000 * ((actualSpellMakingTimeCost + 30) / 60); // there was another error here: rank risregarded*/
+            
+            actualInstructionFee = FormulaHelper.CalculateTradePrice(baseInstructionFee, buildingDiscoveryData.quality, false);
+
+            actualSpellPointCostOfMaking = actualSpellPointCost * 3;
+            baseSpellPointPotionCost = actualSpellPointCostOfMaking * (11 - playerRankInGuild);   // a function of spell point cost of learning and guild rank
+            actualSpellPointPotionCost = FormulaHelper.CalculateTradePrice(baseSpellPointPotionCost, buildingDiscoveryData.quality, false);
+            actualFatigueCostOfMaking = PlayerEntity.DefaultFatigueLoss * actualSpellMakingTimeCost;
+            actualFatigueCostOfMakingToPlayer = (actualFatigueCostOfMaking + 30) / 60;        // rounded number
+            baseFatiguePotionCost = actualFatigueCostOfMakingToPlayer * (11 - playerRankInGuild) / 2;       // a function of fatigue cost of learning and guild rank
+            actualFatiguePotionCost = FormulaHelper.CalculateTradePrice(baseFatiguePotionCost, buildingDiscoveryData.quality, false);
+
+            // Costs are halved on Witches Festival holiday
+            uint gameMinutes = DaggerfallUnity.Instance.WorldTime.DaggerfallDateTime.ToClassicDaggerfallTime();
+            int holidayID = FormulaHelper.GetHolidayId(gameMinutes, 0);
+            if (holidayID == (int)DaggerfallConnect.DFLocation.Holidays.Witches_Festival)
+            {
+                actualGuildFee = Math.Max(actualGuildFee / 2, 1);
+                actualInstructionFee = Math.Max(actualInstructionFee / 2, 1);
+                actualSpellPointPotionCost = Math.Max(actualSpellPointPotionCost / 2, 1);
+                actualFatiguePotionCost = Math.Max(actualFatiguePotionCost / 2, 1);
+            }
+        }
+
+        public EffectBundleSettings ActualStateOfTheSpellCreated()
+        {
+            List<EffectEntry> effects = GetEffectEntries();
+            spell = new EffectBundleSettings();
+            spell.Version = EntityEffectBroker.CurrentSpellVersion;
+            spell.BundleType = BundleTypes.Spell;
+            spell.TargetType = selectedTarget;
+            spell.ElementType = selectedElement;
+            spell.Name = spellNameLabel.Text;
+            spell.IconIndex = selectedIcon.index;
+            spell.Icon = selectedIcon;
+            spell.Effects = effects.ToArray();
+            return spell;
+        }
+
         protected void UpdateSpellCosts()
         {
             SilentMessage("UpdateSpellCosts called");
@@ -728,16 +939,17 @@ namespace MTMMM
 
             // Do nothing when effect editor not setup or not used effect slots
             // This means there is nothing to calculate
-            if (effectEditor == null || !effectEditor.IsSetup || CountUsedEffectSlots() == 0)
+            if (effectEditor == null || !effectEditor.IsSetup)
             {
                 SetStatusLabels();
                 return;
-            }
+            }            
 
             // Update slot being edited with current effect editor settings
             if (editOrDeleteSlot != -1)
                 effectEntries[editOrDeleteSlot] = effectEditor.EffectEntry;
 
+            /*
             // Get total costs
             (totalGoldCost, totalSpellPointCost) = FormulaHelper.CalculateTotalEffectCosts(effectEntries, selectedTarget);
 
@@ -758,22 +970,112 @@ namespace MTMMM
             actualSpellPointCostOfMaking = totalSpellPointCost * 3;
             int hoursOfInstructionCompleted = (actualSpellMakingTimeCost / 60);
             totalGoldCost += 1000 * hoursOfInstructionCompleted;     // flat fee of 1000 for each hour finished
+            */
+            CalculateSpellCosts();
 
-            SilentMessage(string.Format("Calculated new spell costs. Original total gold cost= {0}, Spell Making Time={1} minutes, hours completed={2}, total gold cost={3}.",
-                originalTotalGoldCost, actualSpellMakingTimeCost, hoursOfInstructionCompleted, totalGoldCost));
+                    // TODO: handle this CountUsedEffectSlots() == 0
+
+            SilentMessage("Update spell costs. Printing calculation results. Guild Fee {0}->{1}. Learning time: {2} minutes, instruction fee: {3}->{4}. " +
+                    "SpellPointCost: {5}, Fatigue Cost: {6} (cca. {7}), SpellPoint Potion Cost: {8}->{9}, Fatigue Potion Cost: {10}->{11}.", baseGuildFee,
+                    actualGuildFee, actualSpellMakingTimeCost, baseInstructionFee, actualInstructionFee, actualSpellPointCostOfMaking, actualFatigueCostOfMaking,
+                    actualFatigueCostOfMakingToPlayer, baseSpellPointPotionCost, actualSpellPointPotionCost, baseFatiguePotionCost, actualFatiguePotionCost);
 
             SetStatusLabels();
         }
 
         #endregion
 
-        #region Button Events
+        private string ToUnavailable(string effectEntry)
+        {
+            return "  " + effectEntry;
+        }
+
+        private bool IsAvailable (string effectEntry)
+        {
+            return !effectEntry.StartsWith("  ");
+        }       // TODO: consider merging these with SpellBookWindow and moving it to a common helper
+
+        #region Button Events        
 
         protected virtual void AddEffectButton_OnMouseClick(BaseScreenComponent sender, Vector2 position)
         {
             const int noMoreThan3Effects = 1707;
 
+            if (knowableEffects == null || knowableEffectGroups == null)
+            {
+                knowableEffects = new Dictionary<string, string[]>();
+                knowableEffectGroups = new List<string>();
+
+                string[] groupNames0 = GameManager.Instance.EntityEffectBroker.GetGroupNames(true, thisMagicStation);
+
+                for (int i = 0; i < groupNames0.Length; i++)
+                {
+                    int usableSubGroupCount = 0;
+
+                    List<IEntityEffect> enumeratedEffectTemplates0 = GameManager.Instance.EntityEffectBroker.GetEffectTemplates(groupNames0[i], thisMagicStation);
+                    List<string> knowableSubGroups = new List<string>();
+
+                    string toPrint = string.Format("Group #{0}: '{1}'", i, groupNames0[i]) + Environment.NewLine;
+
+                    for (int j = 0; j < enumeratedEffectTemplates0.Count; j++)
+                    {
+                        toPrint += string.Format("Key='{0}', GroupName='{1}', SubGroupName='{2}', ",
+                            enumeratedEffectTemplates0[j].Key, enumeratedEffectTemplates0[j].GroupName, enumeratedEffectTemplates0[j].SubGroupName) + " ";
+
+                        if (!MMMEffectAndSpellHandler.IsEffectKnowableToPlayerHere(enumeratedEffectTemplates0[j].Key))
+                        {
+                            toPrint += "not knowable here." + Environment.NewLine;
+                            continue;
+                        }
+
+                        if (MMMEffectAndSpellHandler.CanTheyTeachThisEffectHere(enumeratedEffectTemplates0[j].Key))
+                        {
+                            toPrint += "knowable and usable here." + Environment.NewLine;
+                            knowableSubGroups.Add(enumeratedEffectTemplates0[j].Key);
+                            usableSubGroupCount += 1;
+                        }
+                        else
+                        {
+                            toPrint += "knowable but not usable here." + Environment.NewLine;
+                            knowableSubGroups.Add(ToUnavailable(enumeratedEffectTemplates0[j].Key));
+                        }
+                    }
+
+                    if (knowableSubGroups.Count == 0)
+                    {
+                        toPrint+="Effect Group not knowable here.";
+                    }
+                    else
+                    {                        
+                        if (usableSubGroupCount > 0)
+                        {
+                            toPrint+= "Effect group knowable and usable here.";
+                            knowableEffectGroups.Add(groupNames0[i]);
+                            knowableEffects.Add(groupNames0[i], knowableSubGroups.ToArray());
+                        }
+                        else
+                        {
+                            toPrint+= "Effect group knowable but not usable here.";
+                            knowableEffectGroups.Add(ToUnavailable(groupNames0[i]));
+                        }                        
+                    }
+                    SilentMessage(toPrint);
+                }
+            }
             DaggerfallUI.Instance.PlayOneShot(SoundClips.ButtonClick);
+
+            // TODO: here, we put a check on whether effect availability has already been checked
+            //              if not, call a method that goes through, evaluates each effect and saves them in a transparent data-structure
+            //              the data structure should be a Dictionary (string, entry[]) where entry is a struct consisting of a Key and an availability signal
+            //              availability could be either
+            //                      Nonvisible - conf level higher than player standing in guild - player shoud see no mention of this effect
+            //                      Nonavailable - conf level equal or lower than player standing in guild, but the effect falls outside the current Hall's Theme
+                                                    //      player should see this but should be signalled that it is not available in some way and when clicked, a MessageBox should clarify
+            //                      Available - player standing sufficient and spell falls into the guild hall's Theme - this should be normal, player can pick these ones
+            //              if check is made, then check against this data-structure
+            //                      if all elements of effect group are NonVisible, then entire subgroup should be NonVisible
+            //                      if all elements of effect group are NonAvailable, then entire subgroup should be NonAvailable
+            //                      otherwise, subgroup should be Avaiable
 
             // Must have a free effect slot
             if (GetFirstFreeEffectSlotIndex() == -1)
@@ -792,12 +1094,9 @@ namespace MTMMM
             effectGroupPicker.ListBox.ClearItems();
             tipLabel.Text = string.Empty;
 
-            // TODO: Filter out effects incompatible with any effects already added (e.g. incompatible target types)
-
-            // Populate group names
-            string[] groupNames = GameManager.Instance.EntityEffectBroker.GetGroupNames(true, thisMagicStation);
-                    // MT TODO: print these into Player.log
-            effectGroupPicker.ListBox.AddItems(groupNames);
+            // TODO: Filter out effects incompatible with any effects already added (e.g. incompatible target types)                      
+                    
+            effectGroupPicker.ListBox.AddItems(knowableEffectGroups);
             effectGroupPicker.ListBox.SelectedIndex = 0;
 
             // Show effect group picker
@@ -808,16 +1107,25 @@ namespace MTMMM
         {
             const int notEnoughGold = 1702;
             const int noSpellBook = 1703;
-            const int youMustChooseAName = 1704;            
+            const int youMustChooseAName = 1704;
+
+            DaggerfallMessageBox messageBox;
+
+            CalculateSpellCosts();
 
             DaggerfallUI.Instance.PlayOneShot(SoundClips.ButtonClick);
 
+            SilentMessage("Attempting to make a spell. 1st stage. Printing calculation results. Guild Fee {0}->{1}. Learning time: {2} minutes, instruction fee: {3}->{4}. " +
+                    "SpellPointCost: {5}, Fatigue Cost: {6} (cca. {7}), SpellPoint Potion Cost: {8}->{9}, Fatigue Potion Cost: {10}->{11}.", baseGuildFee,
+                    actualGuildFee, actualSpellMakingTimeCost, baseInstructionFee, actualInstructionFee, actualSpellPointCostOfMaking, actualFatigueCostOfMaking,
+                    actualFatigueCostOfMakingToPlayer, baseSpellPointPotionCost, actualSpellPointPotionCost, baseFatiguePotionCost, actualFatiguePotionCost);
+            
             // Presence of spellbook is also checked earlier
             if (!GameManager.Instance.PlayerEntity.Items.Contains(ItemGroups.MiscItems, (int)MiscItems.Spellbook))
             {
                 DaggerfallUI.MessageBox(noSpellBook);
                 return;
-            }
+            }            
 
             // Spell must have at least one effect - adding custom message
             List<EffectEntry> effects = GetEffectEntries();
@@ -834,7 +1142,9 @@ namespace MTMMM
                 return;
             }
             else
-                SilentMessage("BuyButton_OnMouseClick: Text in spellNameLabel: "+ spellNameLabel.Text);
+                SilentMessage("BuyButton_OnMouseClick called. Text in spellNameLabel: "+ spellNameLabel.Text);
+
+            messageBox = new DaggerfallMessageBox(uiManager, this);
 
             // Create effect bundle settings
             spell = new EffectBundleSettings();
@@ -843,84 +1153,150 @@ namespace MTMMM
             spell.TargetType = selectedTarget;
             spell.ElementType = selectedElement;
             spell.Name = spellNameLabel.Text;           // TODO: dump data to player.log
-            SilentMessage("BuyButton_OnMouseClick: Spell name set=" + spell.Name);
+            SilentMessage("BuyButton_OnMouseClick: Spell name set='" + spell.Name+"'");
 
             spell.IconIndex = selectedIcon.index;
             spell.Icon = selectedIcon;
             spell.Effects = effects.ToArray();
-
-            actualSpellMakingTimeCost = MMMFormulaHelper.CalculateSpellCreationTimeCost(spell, true);
-            actualSpellPointCostOfMaking = totalSpellPointCost * 3;      // TODO: consider moving this constant to mod options
-
+            
             if (actualSpellMakingTimeCost > 600)
             {
-                DaggerfallUI.MessageBox("You seem unable to master such a spell. Perhaps if you had more intelligence, experience in the relevant school of magic or with similar spells...");
+                //DaggerfallUI.MessageBox("You seem unable to master such a spell. (More intelligence, experience in the school or with similar spells could help.");
+                messageBox.SetText(WouldTakeTooMuchTimeMessage);
+                messageBox.ClickAnywhereToClose = true;
+                messageBox.Show();
                 return;
             }
 
-            if ((GameManager.Instance.PlayerEntity.CurrentFatigue < PlayerEntity.DefaultFatigueLoss * (actualSpellMakingTimeCost + 60)) || // should provide for enough fatigue to end training with 1 hours reserve left
-                (GameManager.Instance.PlayerEntity.CurrentMagicka < actualSpellPointCostOfMaking))
-            {
-                DaggerfallUI.MessageBox("You seem too tired to learn this spell right now. Return when you are well rested.");
-                return;
+            if ((GameManager.Instance.PlayerEntity.CurrentFatigue < PlayerEntity.DefaultFatigueLoss * (actualSpellMakingTimeCost + 60)) || // should provide for fatigue to end training with 1 hours reserve left
+                    (GameManager.Instance.PlayerEntity.CurrentMagicka < actualSpellPointCostOfMaking))
+            {       // if the player is low on fatigue or magicka (if player has enough gold, then offered refreshments, otherwise dismissed)
+                if (GameManager.Instance.PlayerEntity.GetGoldAmount() < actualGuildFee + actualInstructionFee + actualSpellPointPotionCost + actualFatiguePotionCost)
+                {           // dismissed to return when rested
+                    messageBox.SetText(MMMMessages.GetMessage(TooTiredAndNotEnoughGoldForPotionsMessage, actualGuildFee, actualSpellMakingTimeCost,
+                        actualInstructionFee, actualFatigueCostOfMakingToPlayer, actualSpellPointCostOfMaking));
+                    // what needs to be passed: (0) guild fee, (1) time cost, (2) instruction cost, (3) fatigue cost, (4) spell point cost
+                    messageBox.ClickAnywhereToClose = true;
+                    messageBox.Show();
+                    return;
+                }
+                else
+                {           // offered training + refreshments
+                    SilentMessage("Player is offered training + refreshments.");
+                    messageBox.SetText(MMMMessages.GetMessage(HasToTakeRefreshmentsMessage, actualGuildFee, actualSpellMakingTimeCost, actualInstructionFee,
+                        actualFatigueCostOfMakingToPlayer, actualSpellPointCostOfMaking, actualFatiguePotionCost, actualSpellPointPotionCost,
+                        actualGuildFee + actualInstructionFee + actualFatiguePotionCost + actualSpellPointPotionCost));
+                    // what needs to be passed: (0) guild fee, (1) time cost, (2) instruction cost, (3) fatigue cost, (4) spell point cost, (5) actual fatigue potion cost,
+                    // (6) actual spellpoint potion cost, (7) total gold cost including refreshments
+
+                    buyingPotionsToo = true;
+                    messageBox.AddButton(DaggerfallMessageBox.MessageBoxButtons.Yes);
+                    messageBox.AddButton(DaggerfallMessageBox.MessageBoxButtons.No);
+                    messageBox.OnButtonClick += ConfirmTrade_OnButtonClick;
+                    messageBox.Show();
+                    //uiManager.PushWindow(messageBox);
+                    return;
+                }
+                //DaggerfallUI.MessageBox("You seem too tired to learn this spell right now. Return when you are well rested.");
+
             }
 
-            // Enough money?
-            var moneyAvailable = GameManager.Instance.PlayerEntity.GetGoldAmount();
-            if (moneyAvailable < totalGoldCost)
-            {
-                DaggerfallUI.MessageBox(notEnoughGold);
+            if (GameManager.Instance.PlayerEntity.GetGoldAmount() < actualGuildFee + actualInstructionFee + actualSpellPointPotionCost + actualFatiguePotionCost)
+            {           // if gold not sufficient to cover refreshments too, then offer just bare essentials
+                SilentMessage("Player is offered training without refreshments.");
+                messageBox.SetText(MMMMessages.GetMessage(OnlyBareEssentialsMessage, actualGuildFee, actualSpellMakingTimeCost,
+                    actualInstructionFee, actualFatigueCostOfMakingToPlayer, actualSpellPointCostOfMaking));
+                // what needs to be passed: (0) guild fee, (1) time cost, (2) instruction cost, (3) fatigue cost, (4) spell point cost
+                buyingPotionsToo = false;
+                messageBox.AddButton(DaggerfallMessageBox.MessageBoxButtons.Yes);
+                messageBox.AddButton(DaggerfallMessageBox.MessageBoxButtons.No);
+                messageBox.OnButtonClick += ConfirmTrade_OnButtonClick;
+                messageBox.Show();
+                //uiManager.PushWindow(messageBox);
                 return;
             }
-
-
-                                 
-            DaggerfallMessageBox confirmMessageBox = new DaggerfallMessageBox(uiManager, this);
-            string[] actualSpellMakingBoxText = { onSpellMake1[0],
-                string.Format(onSpellMake1[1], totalGoldCost-((actualSpellMakingTimeCost/60) * 1000)),    // guild fee gold cost
-                string.Format(onSpellMake1[2], actualSpellMakingTimeCost, actualSpellPointCostOfMaking),    // time cost, spell point cost
-                onSpellMake1[3], 
-                string.Format(onSpellMake1[4], (actualSpellMakingTimeCost/60) * 1000),      // training gold cost // TODO: consider moving this 1000 to mod options
-                onSpellMake1[5],
-                string.Format(onSpellMake1[6], totalGoldCost, actualSpellMakingTimeCost, actualSpellPointCostOfMaking, PlayerEntity.DefaultFatigueLoss * actualSpellMakingTimeCost / 60),
-                onSpellMake1[7], onSpellMake1[8]};
-
-            confirmMessageBox.SetText(actualSpellMakingBoxText);        //  there was a second argument originally, I don't know if this difference is significant or not
-            confirmMessageBox.AddButton(DaggerfallMessageBox.MessageBoxButtons.Yes);
-            confirmMessageBox.AddButton(DaggerfallMessageBox.MessageBoxButtons.No);
-            confirmMessageBox.OnButtonClick += ConfirmTrade_OnButtonClick;
-            confirmMessageBox.PreviousWindow = this;
-            confirmMessageBox.OnClose += SpellHasBeenInscribed_OnClose;
-            confirmMessageBox.Show();
-            //uiManager.PushWindow(confirmMessageBox);
+            else
+            {           // if everything goes for the player, he is prompted if he'd prefer with refreshments or without
+                SilentMessage("Player is prompted if he'd prefer with refreshments or without.");
+                messageBox.SetText(MMMMessages.GetMessage(HasChoiceAboutBuyingRefreshmentsMessage, actualGuildFee, actualSpellMakingTimeCost,
+                    actualInstructionFee, actualFatigueCostOfMakingToPlayer, actualSpellPointCostOfMaking, actualFatiguePotionCost, actualSpellPointPotionCost));
+                // what needs to be passed: (0) guild fee, (1) time cost, (2) instruction cost, (3) fatigue cost, (4) spell point cost
+                // (5) actual fatigue potion cost, (6) actual spellpoint potion cost
+                buyingPotionsToo = false;
+                messageBox.AddButton(DaggerfallMessageBox.MessageBoxButtons.Yes);
+                messageBox.AddButton(DaggerfallMessageBox.MessageBoxButtons.No);
+                messageBox.OnButtonClick += ConfirmTrade_PlayerPromptedWhetherHeWantsRefreshments;
+                messageBox.Show();
+                //uiManager.PushWindow(messageBox);
+                return;
+            }
         }
+
+        protected virtual void ConfirmTrade_PlayerPromptedWhetherHeWantsRefreshments(DaggerfallMessageBox sender, DaggerfallMessageBox.MessageBoxButtons messageBoxButton)
+        {
+            uiManager.PopWindow();
+            DaggerfallMessageBox messageBox = new DaggerfallMessageBox(uiManager, this);
+
+            if (messageBoxButton == DaggerfallMessageBox.MessageBoxButtons.Yes)
+            {
+                messageBox.SetText(MMMMessages.GetMessage(HasAcceptedTakingRefreshmentsMessage, actualGuildFee + actualInstructionFee + actualSpellPointPotionCost +
+                    actualFatiguePotionCost, actualSpellMakingTimeCost));
+                // (0) total gold cost including refreshments, (1) time cost
+                buyingPotionsToo = true;    // the player has opted to take refreshments
+            }
+            else
+            {
+                messageBox.SetText(MMMMessages.GetMessage(OnlyBareEssentialsMessage, actualGuildFee, actualSpellMakingTimeCost, actualInstructionFee,
+                    actualFatigueCostOfMakingToPlayer, actualSpellPointCostOfMaking));
+                // what needs to be passed: (0) guild fee, (1) time cost, (2) instruction cost, (3) fatigue cost, (4) spell point cost
+                buyingPotionsToo = false;   // the player has opted to decline refreshments
+            }
+
+            messageBox.AddButton(DaggerfallMessageBox.MessageBoxButtons.Yes);
+            messageBox.AddButton(DaggerfallMessageBox.MessageBoxButtons.No);
+            messageBox.OnButtonClick += ConfirmTrade_OnButtonClick;
+            messageBox.Show();
+            //uiManager.PushWindow(messageBox);
+        }
+
 
         protected virtual void ConfirmTrade_OnButtonClick(DaggerfallMessageBox sender, DaggerfallMessageBox.MessageBoxButtons messageBoxButton)
         {
+                    // TODO: invent and apply condition when base method needs to be executed
             const int spellHasBeenInscribed = 1705;
             if (messageBoxButton == DaggerfallMessageBox.MessageBoxButtons.Yes)
             {
                 SilentMessage("ConfirmTrade_OnButtonClickPlayer: player fatigue before change: " + GameManager.Instance.PlayerEntity.CurrentFatigue);
-                GameManager.Instance.PlayerEntity.DeductGoldAmount(totalGoldCost);     
+
+                int goldCost = actualGuildFee + actualInstructionFee;
+                if (buyingPotionsToo)
+                    goldCost += actualFatiguePotionCost + actualSpellPointPotionCost;
+                GameManager.Instance.PlayerEntity.DeductGoldAmount(goldCost);     
                 
                 SilentMessage("ConfirmTrade_OnButtonClickPlayer: spell name before save: "+spell.Name);
                     // Add to player entity spellbook
-                GameManager.Instance.PlayerEntity.AddSpell(spell);                
-
+                GameManager.Instance.PlayerEntity.AddSpell(spell);  
                 DaggerfallUI.Instance.PlayOneShot(inscribeGrimoire);
+
+                int numberOfFatiguePointsToSubtract = 0;
+                int numberOfSpellointsToSubtract = 0;
+
+                if (!buyingPotionsToo)
+                {
+                    numberOfFatiguePointsToSubtract = actualFatigueCostOfMaking;
+                    numberOfSpellointsToSubtract = actualSpellPointCostOfMaking;
+
+                    GameManager.Instance.PlayerEntity.DecreaseFatigue(numberOfFatiguePointsToSubtract);
+                    GameManager.Instance.PlayerEntity.DecreaseMagicka(numberOfSpellointsToSubtract);
+                }
+
                 MTMostlyMagicMod.ElapseMinutes(actualSpellMakingTimeCost);
 
-                int numberOfFatiguePointsToSubtract = PlayerEntity.DefaultFatigueLoss * actualSpellMakingTimeCost;
-                int numberOfSpellointsToSubtract = actualSpellPointCostOfMaking;
-
-                GameManager.Instance.PlayerEntity.DecreaseFatigue(numberOfFatiguePointsToSubtract);
-                GameManager.Instance.PlayerEntity.DecreaseMagicka(numberOfSpellointsToSubtract);
-
                 SilentMessage(string.Format("ConfirmTrade_OnButtonClick: Spell making costs incurred. Gold={0}, SpellPoints={1}, FatiguePoints={2}, Time={3} minutes.",
-                        totalGoldCost, numberOfSpellointsToSubtract, numberOfFatiguePointsToSubtract, actualSpellMakingTimeCost));
+                    goldCost, numberOfSpellointsToSubtract, numberOfFatiguePointsToSubtract, actualSpellMakingTimeCost));
                 SilentMessage("ConfirmTrade_OnButtonClickPlayer: player fatigue after change: " + GameManager.Instance.PlayerEntity.CurrentFatigue);
 
-                    // now, have spell engineering train the relevant magic skills too
+                // now, have spell engineering train the relevant magic skills too
                 int hoursOfInstructionCompleted = actualSpellMakingTimeCost / 60;
 
                 IEntityEffect effectTemplate;
@@ -937,7 +1313,9 @@ namespace MTMMM
                     GameManager.Instance.PlayerEntity.TallySkill(skillToTrain, tallyAmount);
                     SilentMessage(string.Format("ConfirmTrade_OnButtonClickPlayer. {0}/{1}: totalTrainingPoints={2}, key={3}, skillToTrain={4}, skillAdvancementMultiplier={5}, tallyAmount={6}",
                         i+1, spell.Effects.Length, totalTrainingPoints, spell.Effects[i].Key, (int)skillToTrain, skillAdvancementMultiplier, tallyAmount));
-                }                
+                }
+
+                MMMXPTallies.CalculationDebugToPlayer = calculationDebugToPlayerBefore;
                 CloseWindow();
             }
             else
@@ -945,7 +1323,7 @@ namespace MTMMM
                 SilentMessage("ConfirmTrade_OnButtonClickPlayer: the player has apparently chosen No.");
                 CloseWindow();
             }
-        }
+        }       
 
         protected virtual void SpellHasBeenInscribed_OnClose()
         {
@@ -1066,12 +1444,43 @@ namespace MTMMM
         protected virtual void AddEffectGroupListBox_OnUseSelectedItem()
         {
             // Clear existing
+
             effectSubGroupPicker.ListBox.ClearItems();
+
+            if (!IsAvailable(effectGroupPicker.ListBox.SelectedItem))
+            {
+                DaggerfallMessageBox messageBox = new DaggerfallMessageBox(uiManager, this);
+                messageBox.SetText(NeedToFindOtherTeacherMessage);      // for some reason, it didn't work with ",this" added
+                messageBox.ClickAnywhereToClose = true;
+                messageBox.Show();
+            }           // if unavailable, send appropriate messagebox 
+
+            if (knowableEffects[effectGroupPicker.ListBox.SelectedItem].Length == 1)
+            {
+                effectGroupPicker.CloseWindow();
+                IEntityEffect effectTemplate = GameManager.Instance.EntityEffectBroker.GetEffectTemplate(knowableEffects[effectGroupPicker.ListBox.SelectedItem][0]);        // get effect template 
+                AddAndEditSlot(effectTemplate);
+                //uiManager.PushWindow(effectEditor);
+                return;
+            }
+            // should always have at least 1 element, because otherwise it would have been discarded in data generation step
+
+            effectSubGroupPicker.ListBox.AddItems(knowableEffects[effectGroupPicker.ListBox.SelectedItem]);
+            effectSubGroupPicker.ListBox.SelectedIndex = 0;
+
+            uiManager.PushWindow(effectSubGroupPicker);
+
+            /*
             enumeratedEffectTemplates.Clear();
 
+            // TODO: here we work from effectGroupPicker.ListBox.SelectedItem - this has the text that was selected
+            //  if text UnAvailable, send messagebox
+            //          otherwise do as before, just begin with knowableEffects[effectGroupPicker.ListBox.SelectedItem]
+
             // Enumerate subgroup effect key name pairs
+
             enumeratedEffectTemplates = GameManager.Instance.EntityEffectBroker.GetEffectTemplates(effectGroupPicker.ListBox.SelectedItem, thisMagicStation);       // this only gets templates for the selected group
-                                                                                                                                                                    // MT TODO: print these into Player.log
+                                                                                                                                                                    
             if (enumeratedEffectTemplates.Count < 1)
                 throw new Exception(string.Format("Could not find any effect templates for group {0}", effectGroupPicker.ListBox.SelectedItem));
 
@@ -1083,7 +1492,7 @@ namespace MTMMM
                 //uiManager.PushWindow(effectEditor);
                 return;
             }
-
+                    
             // Sort list by subgroup name
             enumeratedEffectTemplates.Sort((s1, s2) => s1.SubGroupName.CompareTo(s2.SubGroupName));
 
@@ -1092,23 +1501,34 @@ namespace MTMMM
             {
                 effectSubGroupPicker.ListBox.AddItem(effect.SubGroupName);
             }
-            effectSubGroupPicker.ListBox.SelectedIndex = 0;
+            effectSubGroupPicker.ListBox.SelectedIndex = 0; 
 
             // Show effect subgroup picker
             // Note: In classic the group name is now shown (and mostly obscured) behind the picker at first available effect slot
             // This is not easily visible and not sure if this really communicates anything useful to user
             // Daggerfall Unity also allows user to cancel via escape back to previous dialog, so changing this beheaviour intentionally
-            uiManager.PushWindow(effectSubGroupPicker);
+            uiManager.PushWindow(effectSubGroupPicker); */
         }
 
         protected virtual void AddEffectSubGroup_OnUseSelectedItem()
         {
+            DaggerfallMessageBox messageBox = new DaggerfallMessageBox(uiManager, this);
+
+            if (!IsAvailable(effectSubGroupPicker.ListBox.SelectedItem))
+            {
+                messageBox.SetText(NeedToFindOtherTeacherMessage);      // for some reason, it didn't work with ",this" added
+                messageBox.ClickAnywhereToClose = true;
+                messageBox.Show();
+                return;
+            }           // if unavailable, send appropriate messagebox 
+
             // Close effect pickers
             effectGroupPicker.CloseWindow();
             effectSubGroupPicker.CloseWindow();
 
             // Get selected effect from those on offer
-            IEntityEffect effectTemplate = enumeratedEffectTemplates[effectSubGroupPicker.ListBox.SelectedIndex];
+            IEntityEffect effectTemplate = GameManager.Instance.EntityEffectBroker.GetEffectTemplate(effectSubGroupPicker.ListBox.SelectedItem);
+            // old version IEntityEffect effectTemplate = enumeratedEffectTemplates[effectSubGroupPicker.ListBox.SelectedIndex];
             if (effectTemplate != null)
             {
                 AddAndEditSlot(effectTemplate);
