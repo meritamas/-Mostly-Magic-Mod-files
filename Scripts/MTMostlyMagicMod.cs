@@ -135,7 +135,7 @@ namespace MTMMM
             if (ourModSettings.GetValue<bool>("QualityOfLife", "ExerciseFastTravel"))
                 TimeAcceleratorUpdate();
 
-            MMMInputManager.OnModUpdate();          // this will ensure that MMMInputManager gets to check for relevant things each update cycle 
+            // MMMInputManager.OnModUpdate();          // this will ensure that MMMInputManager gets to check for relevant things each update cycle - THIS NOT NEEDED YET
         }
 
         public static void ElapseSeconds(int numberOfSecondsToPass)
