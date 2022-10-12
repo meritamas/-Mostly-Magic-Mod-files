@@ -25,7 +25,7 @@ namespace MTMMM
         public static int DefaultConfidentialityLevel = 3;         // if there is no concrete confidentiality level defined for the given effect/guild, this value is used
         static Dictionary<string, int> defaultConfidentialityLevels = new Dictionary<string, int> {
             // NOTE: confidentiality = 0 means it can be provided to non-members (-1), conf of 1 or above means just members
-            { "CreateItem", 3 },          { "Teleport-Effect", 0 },      { "FixItem", 1 },              { "MultiplyProvisions", 1 },        // without group, TODO: set up group
+            { "CreateItem", 3 },          { "Teleport-Effect", 0 },      { "MTRepairItem", 1 },         { "MultiplyProvisions", 1 },        // without group, TODO: set up group
             { "Chameleon-Normal", 0 },    { "Chameleon-True", 6 },                                      { "Charm", 0 },                 { "Climbing", 0 },
             { "ComprehendLanguages", 0 },                                { "ContinuousDamage-Fatigue", 5 }, { "ContinuousDamage-SpellPoints", 5 }, { "ContinuousDamage-Health", 5 },
             { "Cure-Poison", 0 },         { "Cure-Paralyzation", 0 },    { "Cure-Disease", 4 },
@@ -175,7 +175,7 @@ namespace MTMMM
                 foreach (KeyValuePair<string, int> kvp in defaultConfidentialityLevels)
                 {
                     FactionConfidentialityLevels.Add(kvp.Key, kvp.Value);
-                }   // This code creates a new dictionary for the given guild if no such dictionary existed and adds the values from the generic dictionary (a default on hard coded into the mod)  
+                }   // This code creates a new dictionary for the given guild if no such dictionary existed and adds the values from the generic dictionary (a default one hard-coded into the mod)  
                 ConfidentialityLevels.Add(teacherFactionID, FactionConfidentialityLevels);
             }
                 // at this point, FactionConfidentialityLevels points to the appropriate guild dictionary

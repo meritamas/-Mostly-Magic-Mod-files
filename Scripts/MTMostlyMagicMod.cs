@@ -301,11 +301,11 @@ namespace MTMMM
             // templateEffect.CurrentVariant = 0;
             if (!GameManager.Instance.EntityEffectBroker.RegisterEffectTemplate(templateEffect))
             {
-                Message("FixItem effect could not be registered");
+                Message("MTRepairItem effect could not be registered");
                 return;
             }
 
-            Message("FixItem effect successfully registered");
+            Message("MTRepairItem effect successfully registered");
 
             // Create effect settings for our custom spell
             // These are Chance, Duration, and Magnitude required by spell - usually seen in spellmaker

@@ -26,11 +26,11 @@ namespace MTMMM
     /// </summary>
     public class MTRepairItem : BaseEntityEffect
     {
-        public static readonly string EffectKey = "FixItem";
+        public static readonly string EffectKey = "MTRepairItem";
         public static TextFile.Token[] ourSpellMakerDescription = new TextFile.Token[] {
-            new TextFile.Token(TextFile.Formatting.Text, "Fix Item"),
+            new TextFile.Token(TextFile.Formatting.Text, "MT Repair Item"),
             new TextFile.Token(TextFile.Formatting.JustifyCenter, null),
-            new TextFile.Token(TextFile.Formatting.Text, "Capable of fixing mundane items, will restore simpler (e.g. leather, iron, steel) items faster."),
+            new TextFile.Token(TextFile.Formatting.Text, "Capable of repairing mundane items, will restore simpler (e.g. leather, iron, steel) items faster."),
             new TextFile.Token(TextFile.Formatting.JustifyCenter, null),
             new TextFile.Token(TextFile.Formatting.NewLine, null),
             new TextFile.Token(TextFile.Formatting.Text, "Target: an item already in the player's inventory"),
