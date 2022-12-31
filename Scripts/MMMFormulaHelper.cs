@@ -18,6 +18,7 @@ using DaggerfallConnect;
 using DaggerfallWorkshop.Game;
 using DaggerfallWorkshop.Game.Entity;
 using DaggerfallWorkshop.Game.Formulas;
+using DaggerfallWorkshop.Game.Items;
 using DaggerfallWorkshop.Game.MagicAndEffects;
 
 namespace MTMMM
@@ -30,6 +31,8 @@ namespace MTMMM
         public static bool SendInfoMessagesOnPCSpellLevel = false;
         public static bool SendInfoMessagesOnNonPCSpellLevel = false;
         public static bool ApplyExperienceTallies;
+        public static bool PotionMode = false;
+        public static int PotionStrength = 0;
         public static float spellMakerCoefficientFromSettings = 4.0f;
 
         public static GetSpellLevelMethod GetSpellLevel = GetSpellLevel1;
@@ -61,6 +64,19 @@ namespace MTMMM
             MTMostlyMagicMod.SilentMessage(messagePrefix + message, args);
         }
         #endregion
+
+        public static void SetPotionMode (DaggerfallUnityItem item)
+        {
+            PotionMode = true;
+            PotionStrength = UnityEngine.Random.Range(10, 16);
+            SilentMessage("Entering Potion Mode, potion strength (RND between 10 and 15, inclusive): "+PotionStrength);
+        }
+
+        public static void ExitPotionMode()
+        {
+            PotionMode = false;
+            SilentMessage("Exiting Potion Mode.");
+        }
 
         /// <summary>
         /// Calculate the Chance of Success of an effect using the active Spell Level Calculation method. 
@@ -222,6 +238,12 @@ namespace MTMMM
         /// </returns>
         public static int GetSpellLevel1 (IEntityEffect effect)
         {
+            if (PotionMode)
+            {                
+                SilentMessage("GetSpellLevel1: in Potion Mode. Returning Potion Strength: " + PotionStrength);                
+                return PotionStrength;
+            }
+
             DaggerfallEntityBehaviour caster = effect.Caster;
 
             int casterLevel = 1;

@@ -7,11 +7,13 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using DaggerfallConnect;
+using DaggerfallWorkshop;
 using DaggerfallWorkshop.Game;
 using DaggerfallWorkshop.Game.Entity;
 using DaggerfallWorkshop.Game.Formulas;
 using DaggerfallWorkshop.Game.MagicAndEffects;
 using Wenzil.Console;
+using DaggerfallConnect.Arena2;
 
 namespace MTMMM
 {        
@@ -72,6 +74,71 @@ namespace MTMMM
 
         #endregion
 
+        #region RoadsUtilities
 
+        /// <summary>
+        /// A console command to calculate the economic power of a settlement.
+        /// With two arguments, the first one should be a region name and the second one a location name.
+        /// With one argument, the argument is a location name within the current region
+        /// If no argument passed, calculates for the current settlement if any
+        /// </summary>
+        public static string GetEconomicPower(string[] args)
+        {
+            // first determine number of arguments
+            // the two argument version will end with a message that it is not implemented yet
+
+
+            // second, get the settlement's Location based on the argument 
+            //int newTallyValue = MMMXPTallies.SpellXPTally(args[0], float.Parse(args[1]));
+
+            // add the indicators of economic power: resident buildings (consumption)
+            // number of shops * quality level (production, capital)
+            // lack of a certain shop type, an overabundance of certain shops (demand for commerce)
+            // number of taverns * quailty level (tourism)
+            // guilds and temples
+            return "done";
+            
+        }
+
+        public static string MTGetRegionName (string[] args)
+        {
+            string[] RegionNames = MapsFile.RegionNames;
+            int regionNumber;
+
+            if (Int32.TryParse(args[0], out regionNumber))
+            {
+                if (regionNumber < 0 || regionNumber >= DaggerfallUnity.Instance.ContentReader.MapFileReader.RegionCount)
+                {
+                    return "There is no such region.";
+                }
+                else
+                {
+                    return RegionNames[regionNumber];
+                }
+            }
+            else
+                return "Argument0 needs to be a valid region number";
+        }
+
+        public static string MTGetRegionIndex(string[] args)
+        {
+            string[] RegionNames = MapsFile.RegionNames;
+
+            for (int i = 0; i < RegionNames.Length; i++)
+            {
+                if (RegionNames[i] == args[0])
+                    return i.ToString();
+            }
+
+            return "There is no such region.";                     
+        }
+
+        public static string MTAboutLocation(string[] args)
+        {
+            MTRoads.LoadLocation(args[0], args[1]);
+            return MTRoads.PrintLocationCharacteristics();
+        }
+
+        #endregion
     }
 }

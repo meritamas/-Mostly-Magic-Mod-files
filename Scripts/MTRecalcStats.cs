@@ -67,42 +67,147 @@ namespace MTMMM
             MTMostlyMagicMod.SilentMessage(messagePrefix + message);
         }
 
-        public static int GetWorldClimateDiffucultyModifier()
-        {
+        public static int GetPlaceAndTimeDifficultyLevel()
+        {            
+            bool atLocation = (GameManager.Instance.PlayerGPS.CurrentLocationIndex == -1);      // get if e are at a location or not
+            bool atNight = DaggerfallUnity.Instance.WorldTime.Now.IsNight;
+            bool inWinter = (DaggerfallUnity.Instance.WorldTime.Now.SeasonValue == DaggerfallDateTime.Seasons.Winter);
+            bool inSummer = (DaggerfallUnity.Instance.WorldTime.Now.SeasonValue == DaggerfallDateTime.Seasons.Summer);
+                // TOADD: is dungeon present. If so, mob levels should be same as if in dungeon (these people were coming from or going to the DUNGEON, after all)
+            
+            // you need this: climate - see below, timeOFday, season, location
             // Set based on world climate
             switch (GameManager.Instance.PlayerGPS.CurrentClimateIndex)
-            {
-                case (int)MapsFile.Climates.Ocean:   // Ocean
-                    return 0;
-                    break;
-                case (int)MapsFile.Climates.Desert:
-                case (int)MapsFile.Climates.Desert2:
-                    return 5;                               // TODO: more difficult in summertime
-                                                            // TODO: later on: more difficult if surrounded by desert
-                    break;
+            {      
                 case (int)MapsFile.Climates.Mountain:
-                    return 5;                               // TODO: more difficult in winter, more difficult based on pixel height, more difficult if surronded by mountains
-                    break;
-                case (int)MapsFile.Climates.Rainforest:
-                    return 5;                               // TODO: more difficult in rain season, more difficult if surrounded by rainforest
+                    if (atLocation)
+                    {
+                        SilentMessage("GetPlaceAndTimeDifficultyLevel: Climates.Mountain, at location");
+                        return 12;
+                    }
+                    else
+                    {
+                        if (atNight)
+                        {
+                            SilentMessage("GetPlaceAndTimeDifficultyLevel: Climates.Mountain, not in location, at night");
+                            return 18;
+                        }
+                        else
+                        {
+                            SilentMessage("GetPlaceAndTimeDifficultyLevel: Climates.Mountain, not in location, during daytime");
+                            return 15;
+                        }
+                    }
                     break;
                 case (int)MapsFile.Climates.Swamp:
-                    return 5;
-                    break;
-                case (int)MapsFile.Climates.Subtropical:
-                    return 0;
+                case (int)MapsFile.Climates.Woodlands:      // Swamp and Woodlands are the same
+                    if (atLocation)
+                    {
+                        SilentMessage("GetPlaceAndTimeDifficultyLevel: Climates.Swamp/Woodlands, at location");
+                        return 15;
+                    }
+                    else
+                    {
+                        if (atNight)
+                        {
+                            SilentMessage("GetPlaceAndTimeDifficultyLevel: Climates.Swamp/Woodlands, not in location, at night");
+                            return 18;
+                        }
+                        else
+                        {
+                            SilentMessage("GetPlaceAndTimeDifficultyLevel: Climates.Swamp/Woodlands, not in location, during daytime");
+                            return 12;
+                        }
+                    }
                     break;
                 case (int)MapsFile.Climates.MountainWoods:
-                    return 5;                               // TODO: more difficult in winter, more difficult based on pixel height, more difficult if surronded by mountains
+                    if (atLocation)     // TODO: more difficult in winter
+                                        // more difficult based on pixel height
+                                        // more difficult if surronded by mountains
+                    {
+                        SilentMessage("GetPlaceAndTimeDifficultyLevel: Climates.MountainWoods, at location");
+                        return 15;
+                    }
+                    else
+                    {
+                        if (atNight)
+                        {
+                            SilentMessage("GetPlaceAndTimeDifficultyLevel: Climates.MountainWoods, not in location, at night");
+                            return 21;
+                        }
+                        else
+                        {
+                            SilentMessage("GetPlaceAndTimeDifficultyLevel: Climates.MountainWoods, not in location, during daytime");
+                            return 12;
+                        }
+                    }
                     break;
-                case (int)MapsFile.Climates.Woodlands:
-                    return 0;
-                    break;
+
+                case (int)MapsFile.Climates.Rainforest:
+                case (int)MapsFile.Climates.Subtropical:        // Rainforest and Subtropical are the same
+                    if (atLocation)
+                    {
+                        SilentMessage("GetPlaceAndTimeDifficultyLevel: Climates.Rainforest/Subtropical, at location");
+                        return 12;
+                    }
+                    else
+                    {
+                        if (atNight)
+                        {
+                            SilentMessage("GetPlaceAndTimeDifficultyLevel: Climates.Rainforest/Subtropical, not in location, at night");
+                            return 18;
+                        }
+                        else
+                        {
+                            SilentMessage("GetPlaceAndTimeDifficultyLevel: Climates.Rainforest/Subtropical, not in location, during daytime");
+                            return 12;
+                        }
+                    }
+                    break;               
+                                
                 case (int)MapsFile.Climates.HauntedWoodlands:
-                    return +10;
+                    if (atLocation)
+                    {
+                        SilentMessage("GetPlaceAndTimeDifficultyLevel: Climates.HauntedWoodlands, at location");
+                        return 15;
+                    }
+                    else
+                    {
+                        if (atNight)
+                        {
+                            SilentMessage("GetPlaceAndTimeDifficultyLevel: Climates.HauntedWoodlands, not in location, at night");
+                            return 21;
+                        }
+                        else
+                        {
+                            SilentMessage("GetPlaceAndTimeDifficultyLevel: Climates.HauntedWoodlands, not in location, during daytime");
+                            return 12;
+                        }
+                    }
                     break;
+
+                case (int)MapsFile.Climates.Ocean:          // Ocean                    
+                case (int)MapsFile.Climates.Desert:
+                case (int)MapsFile.Climates.Desert2:        // Ocean and Desert are the same, and also the default
                 default:
-                    return 0;
+                    if (atLocation)
+                    {
+                        SilentMessage("GetPlaceAndTimeDifficultyLevel: Climates.Ocean/Desert/Desert2/Default, at location");
+                        return 12;
+                    }
+                    else
+                    {
+                        if (atNight)
+                        {
+                            SilentMessage("GetPlaceAndTimeDifficultyLevel: Climates.Ocean/Desert/Desert2/Default, not in location, at night");
+                            return 15;
+                        }
+                        else
+                        {
+                            SilentMessage("GetPlaceAndTimeDifficultyLevel: Climates.Ocean/Desert/Desert2/Default, not in location, during daytime");
+                            return 8;
+                        }
+                    }
                     break;
             }
         }
@@ -229,16 +334,31 @@ namespace MTMMM
                 case ((int)MonsterCareers.VampireAncient):
                 case ((int)MonsterCareers.AncientLich):
                 case ((int)MonsterCareers.DaedraLord):
+                case ((int)MonsterCareers.OrcShaman):
+                case ((int)MonsterCareers.DaedraSeducer):
+                case ((int)MonsterCareers.Daedroth):
+                case ((int)MonsterCareers.FireDaedra):
+                case ((int)MonsterCareers.FrostDaedra):
+                case ((int)MonsterCareers.Wraith):
+                case ((int)MonsterCareers.Imp):
                     entity.MaxMagicka = (entity.MaxMagicka*spellPointMultiplicator) / 2;
                     if (isThisANewEnemy)
                             entity.CurrentMagicka = entity.MaxMagicka;              // setting new increased spellpoint number - only if running for the first time
 
                     entity.Stats.SetPermanentStatValue(DFCareer.Stats.Intelligence, entity.Stats.PermanentIntelligence+ 20);               // increasing intelligence by 20
                     entity.Stats.SetPermanentStatValue(DFCareer.Stats.Willpower, entity.Stats.PermanentWillpower + 20);                 // increasing willpower by 20
+
                     /* TODO: here comes the code to boost certain skills (magic skills...) and possibly other characteristics for extra strong spellcasters */
                     goto case ((int)MonsterCareers.Werewolf);                
 
                 case ((int)MonsterCareers.Werewolf):
+                case ((int)MonsterCareers.Wereboar):
+                case ((int)MonsterCareers.Giant):
+                case ((int)MonsterCareers.Harpy):
+                case ((int)MonsterCareers.Dragonling_Alternate):
+                case ((int)MonsterCareers.SkeletalWarrior):
+                case ((int)MonsterCareers.Zombie):
+                case ((int)MonsterCareers.Mummy):
                 case ((int)MonsterCareers.OrcWarlord):
                     entity.Level += healthMultiplicator + spellPointMultiplicator; // should be just right... increases the entity's level (important for equipment matrial setting) by a number between 9 and 17
                     entity.MaxHealth = (entity.MaxHealth*healthMultiplicator) / 2;
@@ -249,9 +369,12 @@ namespace MTMMM
                     entity.Stats.SetPermanentStatValue(DFCareer.Stats.Endurance, entity.Stats.PermanentEndurance + 10);
                     entity.Stats.SetPermanentStatValue(DFCareer.Stats.Agility, entity.Stats.PermanentAgility + 20);
                     entity.Stats.SetPermanentStatValue(DFCareer.Stats.Strength, entity.Stats.PermanentStrength + 20);
-                    entity.Stats.SetPermanentStatValue(DFCareer.Stats.Luck, entity.Stats.PermanentLuck + 10);                      // increasing stats for all extra strong monsters
+                    entity.Stats.SetPermanentStatValue(DFCareer.Stats.Luck, entity.Stats.PermanentLuck + 10);                      // increasing stats for all extra strong monsters                    
 
                     /* TODO: here comes the code to boost certain skills (melee skills) and possibly other characteristics for all extra strong monsters */
+                    // increase the armor
+                    // minDmg multiplicator 2x to 4x
+                    // maxDmg
 
                     SilentMessage("An extra strong "+ entity.Career.Name+".");
                     break;
@@ -331,8 +454,9 @@ namespace MTMMM
                 " Shock=" + entity.Resistances.PermanentShock + " Magic =" + entity.Resistances.PermanentMagic + System.Environment.NewLine +
                 itemString + System.Environment.NewLine + 
                 armorString ); 
-        }        
-        /*  The random seed is saved/loaded via a Parchment object that has its name edited to 'MMM????' with ???? being the random seed.        */
+        }
+        /*  The random seed is saved/loaded via a Parchment object that has its name edited,  Name of this object is 'MMM????'
+         *  Base Level is stored in another such object that has its name edited to 'BLMMM??'  */
         int GetEntityRandomSeed()
         {
             if (entity.Items != null)
@@ -343,20 +467,50 @@ namespace MTMMM
                     for (int i = 0; i < numberOfItems; i++)
                     {
                         DaggerfallUnityItem item = entity.Items.GetItem(i);
-                        if (item.shortName.Substring(0, 3) == "MMM")
-                            return Int32.Parse(item.shortName.Substring(3));
+                        if (item.shortName.Substring(0, 3) == "MMM")                        
+                            return Int32.Parse(item.shortName.Substring(3));                              
+                    }
+                }
+            }
+            return -1;
+        }        
+
+        int GetEntityBaseLevel()
+        {
+            if (entity.Items != null)
+            {
+                int numberOfItems = entity.Items.Count;
+                if (numberOfItems > 0)
+                {
+                    for (int i = 0; i < numberOfItems; i++)
+                    {
+                        DaggerfallUnityItem item = entity.Items.GetItem(i);
+                        if (item.shortName.Substring(0, 5) == "BLMMM")
+                        {
+                            return Int32.Parse(item.shortName.Substring(5)); 
+                        }
                     }
                 }
             }
             return -1;
         }
 
-        void SetEntityRandomSeed(int ourSeed)
+        void SetEntityRandomSeed(int ourSeed)    
         {
             if (entity.Items != null)
             {
                 DaggerfallUnityItem newItem = ItemBuilder.CreateItem(ItemGroups.UselessItems2, (int)UselessItems2.Parchment);
-                newItem.shortName = "MMM" + ourSeed;
+                newItem.shortName = "MMM" + ourSeed.ToString("D4");
+                entity.Items.AddItem(newItem);
+            }
+        }
+
+        void SetEntityBaseLevel (int baseLevel)
+        {
+            if (entity.Items != null)
+            {
+                DaggerfallUnityItem newItem = ItemBuilder.CreateItem(ItemGroups.UselessItems2, (int)UselessItems2.Parchment);
+                newItem.shortName = "BLMMM" + baseLevel.ToString("D2");
                 entity.Items.AddItem(newItem);
             }
         }
@@ -462,10 +616,10 @@ namespace MTMMM
                 isThisANewEnemy = true;
                 ourSeed = globalNumberGenerator.Next(0, 10000);
                 SetEntityRandomSeed(ourSeed);
-                SilentMessage("No MMM signal artifact found on entity. Generated and set a random seed of " + ourSeed);
+                SilentMessage("No MMM signal artifact found on entity. Generated and set a random seed of " + ourSeed.ToString("D4"));
             }
             else
-                SilentMessage("Found an MMM signal artifact on entity, random seed: " + ourSeed);
+                SilentMessage("Found an MMM signal artifact on entity, random seed: " + ourSeed.ToString("D4"));
 
             ourNumberGenerator = new System.Random(ourSeed);
 
@@ -549,14 +703,23 @@ namespace MTMMM
              *   ------ all this capped at playerlevel=23; above player level 23, the level of class enemies will not be getting higher */
             if (!GameManager.Instance.PlayerEnterExit.IsPlayerInsideDungeon)
             {
+                int localDifficultyLevel = GetEntityBaseLevel();
+                if (localDifficultyLevel == -1)                
+                    SilentMessage("Player is not inside a dungeon. No BLMMM signal artifact found on entity.");                
+                else
+                    SilentMessage("Player is not inside a dungeon. Found a BLMMM signal artifact on entity, base level: " + localDifficultyLevel.ToString("D2"));
+
+
                 if (careerIndex != (int)MobileTypes.Knight_CityWatch)
                 {
-                    SilentMessage("Player is not inside a dungeon and the entity is NOT a townguard: level-setting by random encounters method.");
-                    int localDifficultyLevel = 10 + GetWorldClimateDiffucultyModifier();
-                                // will now take into account map pixel climate (mount, desert, swamp, hauntedforest should be more difficult)
+                    SilentMessage("The entity is NOT a townguard: level-setting by random encounters method.");
 
-                    // int effectivePlayerLevel = playerLevel;                    
-                    // if (effectivePlayerLevel > 23) effectivePlayerLevel = 23; // cap                    
+                    if (localDifficultyLevel==-1)
+                        localDifficultyLevel = GetPlaceAndTimeDifficultyLevel();
+                                // will now take into account map pixel climate and time of day (maybe later season)
+
+                    SetEntityBaseLevel(localDifficultyLevel); // save BLMMM object
+
                     tempRandomVar = ourNumberGenerator.Next(0, 10);
                     int tempRandomVar2 = ourNumberGenerator.Next(0, 6);
 
@@ -574,71 +737,77 @@ namespace MTMMM
                 }
                 else  // for townguards
                 {
-                    SilentMessage("Player is not inside a dungeon and the entity IS a townguard: setting level accordingly");
+                    SilentMessage("The entity IS a townguard: setting level accordingly");
                     //      If townguard, we implement a method like we have for dungeons :: Town Guard Quality Level
                     //  This quality level is contingent on the size and prominance of the town:
                     //      Daggerfall, Wayrest and Sentinel: base level of 21, like the hardest of dungeons as per Ralzar
                     //      other regional capitals LVL18
                     //      other cities LVL15
-                    //      smallest of towns LVL7
-                    //      general: LVL11
+                    //      smallest of towns LVL8
+                    //      general: LVL12
                     //              there is also a small (-2..+2) correction based on time to account for the fluctuation of the quality of town guards available from time to time 
-                    //          The individual guards can deviate form their guard (average) level (-2..+2)
-                    
-                    int townGuardLevel = 11;     // if nothing else triggers, this should give an 11
+                    //          The individual guards can deviate form their guard (average) level (-2..+2)                    
 
-                            // here comes the code than determines what kind of town the player is in and changes the townGuardLevel accordingly
-                    switch (GameManager.Instance.PlayerGPS.CurrentLocationType)
+                    if (localDifficultyLevel == -1)
                     {
-                        case DFRegion.LocationTypes.TownCity:
-                            townGuardLevel = 15;
-                            break;
-                        case DFRegion.LocationTypes.TownHamlet:
-                            townGuardLevel = 11;
-                            break;
-                        case DFRegion.LocationTypes.TownVillage:
-                            townGuardLevel = 7;
-                            break;
+                        localDifficultyLevel = 12;     // if nothing else triggers, this should give a 12
+
+                        // here comes the code than determines what kind of town the player is in and changes the townGuardLevel accordingly
+                        switch (GameManager.Instance.PlayerGPS.CurrentLocationType)
+                        {
+                            case DFRegion.LocationTypes.TownCity:
+                                localDifficultyLevel = 15;
+                                break;
+                            case DFRegion.LocationTypes.TownHamlet:
+                                localDifficultyLevel = 12;
+                                break;
+                            case DFRegion.LocationTypes.TownVillage:
+                                localDifficultyLevel = 8;
+                                break;
+                        }
+                        // here to adjust for other capitals -- TODO: check if all capitals name is the same as the region (I think there is one or two exceptions)
+                        if (GameManager.Instance.PlayerGPS.CurrentLocation.Name == GameManager.Instance.PlayerGPS.CurrentLocation.RegionName)
+                            localDifficultyLevel = 18;
+
+                        // now to adjust for Daggerfall, Wayrest and Sentinel
+                        if (GameManager.Instance.PlayerGPS.CurrentLocation.Name == "Daggerfall" || GameManager.Instance.PlayerGPS.CurrentLocation.Name == "Wayrest" ||
+                             GameManager.Instance.PlayerGPS.CurrentLocation.Name == "Sentinel")
+                            localDifficultyLevel = 21;                                                       // TODO: test these in-game to see if it triggers, extensive debug messaging
+
+
+                        //  here comes the code that applies the correction for fluctuation
+                        int[] modifierTable = { 0, 1, 2, 1, 0, -1, -2, -1 };
+
+                        int modifierBasedOnHash = 0;       // this should be a modifier from -2 to +2 that is contingent on a hash from the coordinates of the place and the time (like which quarter it is)
+
+                        int currentYear = DaggerfallUnity.Instance.WorldTime.Now.Year;
+                        int currentMonth = DaggerfallUnity.Instance.WorldTime.Now.Month;
+                        // X and Y already defined at the beginning of the method
+
+                        int sequence = (X + Y + currentYear * 4 + currentMonth / 3) % 8;
+                        modifierBasedOnHash = modifierTable[sequence];
+
+                        localDifficultyLevel += modifierBasedOnHash;
+
+                        SetEntityBaseLevel(localDifficultyLevel); // save BLMMM object
                     }
-                            // here to adjust for other capitals
-                    if (GameManager.Instance.PlayerGPS.CurrentLocation.Name == GameManager.Instance.PlayerGPS.CurrentLocation.RegionName)
-                        townGuardLevel = 18;
 
-                            // now to adjust for Daggerfall, Wayrest and Sentinel
-                    if (GameManager.Instance.PlayerGPS.CurrentLocation.Name == "Daggerfall" || GameManager.Instance.PlayerGPS.CurrentLocation.Name == "Wayrest" ||
-                         GameManager.Instance.PlayerGPS.CurrentLocation.Name == "Sentinel")
-                        townGuardLevel = 21;                                                                                            // TODO: test these in-game to see if it triggers, extensive debug messaging
+                    int townGuardLevel = localDifficultyLevel;
 
-                    //  here comes the code that applies the correction for fluctuation
-                    int[] modifierTable = { 0, 1, 2, 1, 0, -1, -2, -1 };
-
-                    int modifierBasedOnHash = 0;       // this should be a modifier from -2 to +2 that is contingent on a hash from the coordinates of the place and the time (like which quarter it is)
-                    
-                    int currentYear = DaggerfallUnity.Instance.WorldTime.Now.Year;
-                    int currentMonth = DaggerfallUnity.Instance.WorldTime.Now.Month;                
-                            // X and Y already defined at the beginning of the method
-
-                    int sequence = (X + Y + currentYear * 4 + currentMonth / 3) % 8;
-                    modifierBasedOnHash = modifierTable[sequence];
-
-                    townGuardLevel += modifierBasedOnHash;
-                                                                                        
                     int[] individualModifierTable = { -2, -1, -1, 0, 0, 0, 0, +1, +1, +2 };
                     townGuardLevel += individualModifierTable[ourNumberGenerator.Next(0, 10)];     // apply the individual fluctuation
-                                                                                                                    // TODO: double check all this and add debug messages
-
-                    entity.Level = townGuardLevel;                                                                                                      
-
-                }
+                                                                                                   // TODO: double check all this and add debug messages
+                    entity.Level = townGuardLevel;  
+                }                            
             }
             else
-                /* If we are inside a dungeon, then the enemy level should depend on dungeon quality level.
+                /* If we are inside a dungeon, then the enemy level should depend on dungeon difficulty level.
                  * 10% DQL-2, 20% DQL-1, 40% DQL, 20% DQL+1, 10% DQL+2                 */   
             {
                 tempRandomVar = ourNumberGenerator.Next(0, 10);                                                     
 
-                int dungeonQualityLevel = MTMostlyMagicMod.dungeonQuality();
-                SilentMessage("Player is inside a dungeon type "+ MTMostlyMagicMod.dungeon+" of QL: "+ dungeonQualityLevel + " random number picked is "+ tempRandomVar);
+                int dungeonQualityLevel = MTMostlyMagicMod.dungeonDifficulty();        // MT check: getDungeonQuality ???
+                SilentMessage("Player is inside a dungeon type "+ MTMostlyMagicMod.dungeon+" of DL: "+ dungeonQualityLevel + " random number picked is "+ tempRandomVar);
                 switch (tempRandomVar)
                 {
                     case 0:
@@ -676,9 +845,10 @@ namespace MTMMM
             if (entity.Level < 1) entity.Level = 1;
             /* Here I try to explain how I think these should work. What the results of all these calculations should be.
              * For dungeons, the base is the dungeon quality level. The basic idea was borrowed from Ralzar's mod. This can range from 3 to 23.
-             *              Most enemies' level will fall within the DQL-2 to DQL+2 interval. So, the least quality dungeons can have as low as LVL1 foes while the highest quality dungeons can have as high as 25 level ones.
+             *              Most enemies' level will fall within the DQL-2 to DQL+2 interval. So, the least quality dungeons can have as low as LVL1 foes while the highest quality dungeons can have as high as level 25 ones.
              *              The exception that you can meet are exceptionally talented foes applies in dungeons as well, so the overall maximum for dungeons is 30 level foes.
-             * For random encounters, most enemies will be in the playerlevel-4 to playerlevel+3 range, with a max level of 26 for a playerlevel of 23.
+             * For random encounters // TODO: this part is no longer valid. Need to re-write
+             *              most enemies will be in the playerlevel-4 to playerlevel+3 range, with a max level of 26 for a playerlevel of 23.
              *              One in ten enemies will be (perhaps significantly) weeker and one in ten will be (perhaps significantly) stronger. The strongest ones should be level 31.
              *              The exception that you can meet are exceptionally talented foes applies here as well, so the overall maximum for random encounters is level 36 foes.
              *                  These should pose a challenge to all but the strongest characters in the game.
@@ -690,7 +860,7 @@ namespace MTMMM
                 */
 
             // II. re-setting max health now
-                       
+
             entity.MaxHealth = MMMFormulaHelper.RollEnemyClassMaxHealth(entity.Level, entity.Career.HitPointsPerLevel, ourNumberGenerator);                              
 
             if (isThisANewEnemy)

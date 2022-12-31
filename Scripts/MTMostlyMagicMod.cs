@@ -75,7 +75,7 @@ namespace MTMMM
         static public int matRoll;
         static public int region = 0;
         static public int dungeon = 0;
-        static public int savedDQL = -1;
+        static public int savedDDL = -1;
         
         static public int mapXCoord = 0;
         static public int mapYCoord = 0;
@@ -121,6 +121,9 @@ namespace MTMMM
             {
                 //  GameManager.Instance.SunlightManager.Angle = -40f;      this code does not work ; but this is where the code that does the job should go 
             }
+
+
+            MTMeanerMonsters.InitMod();         // this should initialize the Meaner Monsters part - integrated from Hazelnut&Ralzar's mod
         }
 
         public void Start()
@@ -201,6 +204,12 @@ namespace MTMMM
             // go2.AddComponent<MTMostlyMagicMod>();   // initializing the Unleveled and Extra Strong enemies part
 
             SilentMessage("Enemy prefab changed successfully");
+
+                // this is for unleveledmobs
+            MTUnleveledMobs.SetTables();
+            MTUnleveledMobs.UpdateTables();
+            SilentMessage("UnleveledEnemies part: Set up spawn tables");
+
             SilentMessage("InitUnleveledEnemies module init method Finished");
         }        
 
@@ -234,8 +243,14 @@ namespace MTMMM
             MTRecalcStats.extraStrongMonsters = ourModSettings.GetValue<bool>("UnleveledAndExtraStrongEnemies", "ExtraStrongMonsters");
             SilentMessage("Extra Strong Monsters Enabled = " + MTRecalcStats.extraStrongMonsters);
 
-            InitEverydayMagic();           
+            InitEverydayMagic();
 
+            if (ourModSettings.GetValue<bool>("EverydayNonMagic", "Roads"))
+            {
+                ConsoleCommandsDatabase.RegisterCommand("MT-GetRegionName", MMMConsoleCommands.MTGetRegionName);
+                ConsoleCommandsDatabase.RegisterCommand("MT-GetRegionIndex", MMMConsoleCommands.MTGetRegionIndex);
+                ConsoleCommandsDatabase.RegisterCommand("MT-AboutLocation", MMMConsoleCommands.MTAboutLocation);
+            }
 
             EndInit();          // Finish Mod Initialization            
         }
@@ -516,26 +531,26 @@ namespace MTMMM
 
         #region Unleveled and Extra Strong Enemies
             // some accelarator code too
-        void InitUnleveledEnemiesOnAwake()
+        void InitUnleveledEnemiesOnAwake()              // MTMT TODO 
         {
             PlayerEnterExit.OnPreTransition += SetDungeon_OnPreTransition;
             PlayerEnterExit.OnTransitionExterior += ClearData_OnTransitionExterior;     // TODO: re-eval if things can be done better
             PlayerGPS.OnMapPixelChanged += SetWildernessDifficultyStuff_OnMapPixelChanged;
             EnemyDeath.OnEnemyDeath += RemoveMMMObjects_OnEnemyDeath;
         }
-                // what this seems to do is generate the dungeon quality level when the player actually enters the dungeon (prior to the transition to the dungeon)
+                // what this seems to do is generate the dungeon difficulty level when the player actually enters the dungeon (prior to the transition to the dungeon)
                 // potential problem: this might not be needed before all transitions           // TODO: evaluate and possibly correct this
         private static void SetDungeon_OnPreTransition(PlayerEnterExit.TransitionEventArgs args)
         {
             region = GameManager.Instance.PlayerGPS.CurrentRegionIndex;
             dungeon = (int)GameManager.Instance.PlayerGPS.CurrentLocation.MapTableData.DungeonType;
-            savedDQL = determineDungeonQuality();            
+            savedDDL = determineDungeonDifficulty();            
         }
 
         private static void ClearData_OnTransitionExterior(PlayerEnterExit.TransitionEventArgs args)
         {
             dungeon = -1;
-            savedDQL = -1;
+            savedDDL = -1;
         }        
 
         private static void SetWildernessDifficultyStuff_OnMapPixelChanged(DFPosition mapPixel)
@@ -545,7 +560,7 @@ namespace MTMMM
             SilentMessage(string.Format("MT MMM: SetWildernessDifficultyStuff_OnMapPixelChanged: Current map pixel is now [{0},{1}].", mapXCoord, mapYCoord));
         }
 
-        public static int determineDungeonQuality()
+        public static int determineDungeonDifficulty()
         {
             int[] modifierTable = { 0, 1, 2, 1, 0, -1, -2, -1 };
 
@@ -566,45 +581,56 @@ namespace MTMMM
 
             switch (dungeon)
             {
-                case (int)DFRegion.DungeonTypes.VolcanicCaves:
-                case (int)DFRegion.DungeonTypes.Coven:
+
+                case (int)DFRegion.DungeonTypes.DragonsDen:
+                case (int)DFRegion.DungeonTypes.VampireHaunt:                
                     DQL = 21 + modifierBasedOnHash;
                     break;
+
+                case (int)DFRegion.DungeonTypes.VolcanicCaves:
+                case (int)DFRegion.DungeonTypes.Coven:
                 case (int)DFRegion.DungeonTypes.DesecratedTemple:
-                case (int)DFRegion.DungeonTypes.DragonsDen:
+                case (int)DFRegion.DungeonTypes.Crypt:
                     DQL = 18 + modifierBasedOnHash;
                     break;
+
+                case (int)DFRegion.DungeonTypes.OrcStronghold:
                 case (int)DFRegion.DungeonTypes.BarbarianStronghold:
-                case (int)DFRegion.DungeonTypes.VampireHaunt:
+                case (int)DFRegion.DungeonTypes.HumanStronghold:
+                case (int)DFRegion.DungeonTypes.Laboratory:
                     DQL = 15 + modifierBasedOnHash;
                     break;
-                case (int)DFRegion.DungeonTypes.Crypt:
-                case (int)DFRegion.DungeonTypes.OrcStronghold:
+
+                case (int)DFRegion.DungeonTypes.Cemetery:
+                case (int)DFRegion.DungeonTypes.GiantStronghold:
+                case (int)DFRegion.DungeonTypes.Prison:
                     DQL = 12 + modifierBasedOnHash;
                     break;
-                case (int)DFRegion.DungeonTypes.Laboratory:
-                case (int)DFRegion.DungeonTypes.HarpyNest:
-                    DQL = 10 + modifierBasedOnHash;
-                    break;
-                case (int)DFRegion.DungeonTypes.GiantStronghold:
-                case (int)DFRegion.DungeonTypes.NaturalCave:            // MT added, missing from Ralzar mod
-                    DQL = 5 + modifierBasedOnHash;
-                    break;
-                case (int)DFRegion.DungeonTypes.HumanStronghold:
+
                 case (int)DFRegion.DungeonTypes.RuinedCastle:
-                case (int)DFRegion.DungeonTypes.Prison:
-                    // this should be contingent on a hash from the name (or coordinates) of the dungeon and the time (like which quarter it is) - for now, setting a value of 8  
+                case (int)DFRegion.DungeonTypes.HarpyNest:
                     DQL = 8 + modifierBasedOnHash;
                     break;
-            }            // dungeon types not covered: ScorpionNest, SpiderNest, Mine, Cemetary
+                
+                case (int)DFRegion.DungeonTypes.NaturalCave:            // MT added, missing from Ralzar mod
+                case (int)DFRegion.DungeonTypes.ScorpionNest:
+                case (int)DFRegion.DungeonTypes.SpiderNest:
+                case (int)DFRegion.DungeonTypes.Mine:
+                    DQL = 5 + modifierBasedOnHash;
+                    break;
 
-            SilentMessage("Determining Dungeon Quality; Year=" + currentYear + " Month=" + currentMonth + " X=" + X + " Y=" + Y + " sequence=" + sequence + " DQModifier=" + modifierBasedOnHash + " DQ=" + DQL);
+                    SilentMessage("determineDungeonDifficulty: Possible erroneous dungeon type."); // MT: code should not reach this point
+                    DQL = 8 + modifierBasedOnHash;
+                    break;
+            }            
+
+            SilentMessage("Determining Dungeon Difficulty; Year=" + currentYear + " Month=" + currentMonth + " X=" + X + " Y=" + Y + " sequence=" + sequence + " DQModifier=" + modifierBasedOnHash + " DQ=" + DQL);
             return DQL;
         }
 
-        public static int dungeonQuality()
+        public static int dungeonDifficulty()
         {
-            return savedDQL;
+            return savedDDL;
         }
 
         public static int RemoveMMMObjectContained (ItemCollection itemCollection)
@@ -620,7 +646,9 @@ namespace MTMMM
                     {
                         DaggerfallUnityItem item = itemCollection.GetItem(i);
                         if (item.shortName.Substring(0, 3) == "MMM")                        
-                            itemsToRemove.Add(item);                        
+                            itemsToRemove.Add(item);
+                        if (item.shortName.Substring(0, 5) == "BLMMM")
+                            itemsToRemove.Add(item);
                     }
                 }
             }
@@ -756,6 +784,13 @@ namespace MTMMM
             }
             else
                 SilentMessage("No need to register MTSpellBookWindow or MTSpellMakerWindow");
+
+            if (ourModSettings.GetValue<bool>("EverydayMagic", "UnleveledSpells"))  // if spells unleveled, need to tackle potions
+            {
+                UIWindowFactory.RegisterCustomUIWindow(UIWindowType.Inventory, typeof(MTInventoryWindow));
+            }
+            else
+                SilentMessage("No need to register MTInventoryWindow");
         }
         #endregion
 

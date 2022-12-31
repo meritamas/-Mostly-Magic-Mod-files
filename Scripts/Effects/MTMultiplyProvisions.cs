@@ -29,9 +29,11 @@ namespace MTMMM
         public static TextFile.Token[] ourSpellMakerDescription = new TextFile.Token[] {
             new TextFile.Token(TextFile.Formatting.Text, "Multiply Provisions"),
             new TextFile.Token(TextFile.Formatting.JustifyCenter, null),
-            new TextFile.Token(TextFile.Formatting.Text, "If you have some of a provision (water, rations, arrows), this effect can add to the provision through conjuration."),
+            new TextFile.Token(TextFile.Formatting.Text, "If you have some of a provision (water, rations, arrows), this effect can add to the"),
             new TextFile.Token(TextFile.Formatting.JustifyCenter, null),
-            new TextFile.Token(TextFile.Formatting.Text, "Will work better when physically near to things that is being conjured up. (E.g. settlements, homes, temples)"),
+            new TextFile.Token(TextFile.Formatting.Text, "provision through conjuration. Will work better when physically near to things that "),
+            new TextFile.Token(TextFile.Formatting.JustifyCenter, null),
+            new TextFile.Token(TextFile.Formatting.Text, "is being conjured up. (E.g. settlements, homes, temples)"),
             new TextFile.Token(TextFile.Formatting.JustifyCenter, null),
             new TextFile.Token(TextFile.Formatting.NewLine, null),
             new TextFile.Token(TextFile.Formatting.Text, "Target: an item that the player is conjuring up"),

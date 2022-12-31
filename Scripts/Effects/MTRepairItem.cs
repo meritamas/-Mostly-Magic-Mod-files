@@ -30,7 +30,9 @@ namespace MTMMM
         public static TextFile.Token[] ourSpellMakerDescription = new TextFile.Token[] {
             new TextFile.Token(TextFile.Formatting.Text, "MT Repair Item"),
             new TextFile.Token(TextFile.Formatting.JustifyCenter, null),
-            new TextFile.Token(TextFile.Formatting.Text, "Capable of repairing mundane items, will restore simpler (e.g. leather, iron, steel) items faster."),
+            new TextFile.Token(TextFile.Formatting.Text, "Capable of repairing mundane items, will restore"),
+            new TextFile.Token(TextFile.Formatting.JustifyCenter, null),
+            new TextFile.Token(TextFile.Formatting.Text, "simpler (e.g. leather, iron, steel) items faster."),
             new TextFile.Token(TextFile.Formatting.JustifyCenter, null),
             new TextFile.Token(TextFile.Formatting.NewLine, null),
             new TextFile.Token(TextFile.Formatting.Text, "Target: an item already in the player's inventory"),
