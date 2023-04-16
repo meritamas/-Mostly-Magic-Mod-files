@@ -1,5 +1,5 @@
 // Project:         MeriTamas's (Mostly) Magic Mod for Daggerfall Unity (http://www.dfworkshop.net)
-// Copyright:       Copyright (C) 2022 meritamas
+// Copyright:       Copyright (C) 2023 meritamas
 // License:         MIT License (http://www.opensource.org/licenses/mit-license.php)
 // Author:          meritamas (meritamas@outlook.com)
 
@@ -234,6 +234,11 @@ namespace MTMMM
             return SpellXPTally(targetType.ToString() + "TT", 0);       // should use the one that does divide by 100
         }
 
+        static int GetMissileTargetTypeXP()
+        {
+            return SpellXPTally(MMMTargetTypes.AreaAtRange.ToString() + "TT", 0) + SpellXPTally(MMMTargetTypes.SingleTargetAtRange.ToString() + "TT", 0);  
+        }
+
         public static MMMTargetTypes GetMMMTargetType (TargetTypes targetType, string effectKey)
         {
             if (ItemEffects.Contains(effectKey))
@@ -252,7 +257,15 @@ namespace MTMMM
                 SilentMessage(string.Format("GetTargetTypeCoefficient: XP for Target Type {0} is {1}", targetType, targetTypeXP));
             return GetCoefficientFromXP(targetTypeXP);
         }
-                
+
+        public static int GetMissileTargetTypeCoefficient()
+        {
+            int missileTypeXP = GetMissileTargetTypeXP();
+            if (CalculationDebugToPlayer)
+                SilentMessage(string.Format("GetMissileTargetTypeCoefficient: XP for Total Missile Target Types is {0}", missileTypeXP));
+            return GetCoefficientFromXP(missileTypeXP);
+        }
+
         public static int ElementTypeTally(ElementTypes elementType, float tallyAmount)
         {
             return SpellXPTally(elementType.ToString() + "E", tallyAmount);
@@ -410,7 +423,45 @@ namespace MTMMM
 
             ElementTypeTally(spell.ElementType, tallyAmount + itemTallyAmount + conjuredItemTallyAmount + conjuredCreatureTallyAmount);  // the element gets it all            
 
-        }        
+        }
+        
+        public static void SetMissileSpeedsInPrefabs()
+        {
+            /*      Interkarma's advice:
+            *      All spell missiles are prefabs in Assets/Prefabs/Missiles.
+            *      Missile speed is controlled by "Movement Speed" property of attached DaggerfallMissile script on each missile prefab.
+            *      These prefabs are registered to PlayerAdvanced object > EntityEffectManager script.
+            *      These are all public properties.
+            *      You could in theory duplicate the missile prefabs and replace the references on PlayerAdvanced at mod startup to use your prefabs instead.
+            *      Then control the "Movement Speed" property based on another script.
+            *
+            *      Something to keep in mind is that small fast objects are more likely to run afoul of the physics system, resulting in poor collisions.
+            *      Be a little conservative with maximum missile and you should be OK.
+                    */
+
+            GameObject go = GameObject.Find("PlayerAdvanced");
+            EntityEffectManager ourEEM = go.GetComponent<EntityEffectManager>();
+
+            float fireMissileSpeed = MMMFormulaHelper.CalculateCombinedXPTalliesCoefficientForMissileSpeed(ElementTypes.Fire, true);
+            ourEEM.FireMissilePrefab.MovementSpeed = fireMissileSpeed;
+            SilentMessage(string.Format("SetMissileSpeedsInPrefabs: Fire missile speed set: {0}", ourEEM.FireMissilePrefab.MovementSpeed.ToString()));
+
+            float coldMissileSpeed = MMMFormulaHelper.CalculateCombinedXPTalliesCoefficientForMissileSpeed(ElementTypes.Cold, true);
+            ourEEM.ColdMissilePrefab.MovementSpeed = coldMissileSpeed;
+            SilentMessage(string.Format("SetMissileSpeedsInPrefabs: Cold missile speed set: {0}", ourEEM.ColdMissilePrefab.MovementSpeed.ToString()));
+
+            float poisonMissileSpeed = MMMFormulaHelper.CalculateCombinedXPTalliesCoefficientForMissileSpeed(ElementTypes.Poison, true);
+            ourEEM.PoisonMissilePrefab.MovementSpeed = poisonMissileSpeed;
+            SilentMessage(string.Format("SetMissileSpeedsInPrefabs: Poison missile speed set: {0}", ourEEM.PoisonMissilePrefab.MovementSpeed.ToString()));
+
+            float shockMissileSpeed = MMMFormulaHelper.CalculateCombinedXPTalliesCoefficientForMissileSpeed(ElementTypes.Shock, true);
+            ourEEM.ShockMissilePrefab.MovementSpeed = shockMissileSpeed;
+            SilentMessage(string.Format("SetMissileSpeedsInPrefabs: Shock missile speed set: {0}", ourEEM.ShockMissilePrefab.MovementSpeed.ToString()));
+
+            float magicMissileSpeed = MMMFormulaHelper.CalculateCombinedXPTalliesCoefficientForMissileSpeed(ElementTypes.Magic, true);
+            ourEEM.MagicMissilePrefab.MovementSpeed = magicMissileSpeed;
+            SilentMessage(string.Format("SetMissileSpeedsInPrefabs: Magic missile speed set: {0}", ourEEM.MagicMissilePrefab.MovementSpeed.ToString()));
+        }
 
         #endregion
 

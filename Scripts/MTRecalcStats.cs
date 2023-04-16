@@ -1,5 +1,5 @@
 // Project:         MeriTamas's (Mostly) Magic Mod for Daggerfall Unity (http://www.dfworkshop.net)
-// Copyright:       Copyright (C) 2022 meritamas
+// Copyright:       Copyright (C) 2023 meritamas
 // License:         MIT License (http://www.opensource.org/licenses/mit-license.php)
 // Author:          meritamas (meritamas@outlook.com)
 // Credits due to LypyL for the modding tutorial based on which this class was created.
@@ -18,6 +18,7 @@ using DaggerfallConnect.Arena2;
 using UnityEngine;
 using DaggerfallWorkshop.Utility;
 using DaggerfallWorkshop.Game;
+using DaggerfallWorkshop.Game.MagicAndEffects;
 using DaggerfallWorkshop.Game.Utility;
 using DaggerfallWorkshop.Game.Utility.ModSupport;   //required for modding features
 using DaggerfallWorkshop.Game.Utility.ModSupport.ModSettings;
@@ -34,6 +35,7 @@ namespace MTMMM
     {
         static string messagePrefix = "MTRecalcStats: ";
         static public bool extraStrongMonsters = false;
+        static public int enemySpellMissileSpeeds = 0;
 
         // From EnemyEntity.cs -- originally from FALL.EXE offset 0x1C0F14
         static byte[] ImpSpells = { 0x07, 0x0A, 0x1D, 0x2C };
@@ -52,6 +54,7 @@ namespace MTMMM
         static byte[][] EnemyClassSpells = { FrostDaedraSpells, DaedrothSpells, OrcShamanSpells, VampireAncientSpells, DaedraLordSpells, LichSpells, AncientLichSpells };
                 
         DaggerfallEntityBehaviour entityBehaviour;
+        EntityEffectManager entityEffectManager;
         EnemyEntity entity;
         PlayerEntity playerEntity;
         static System.Random globalNumberGenerator = new System.Random(System.DateTime.Now.Millisecond);
@@ -445,11 +448,13 @@ namespace MTMMM
             }
 
            SilentMessage(title + " Career.Name: " + entity.Career.Name + System.Environment.NewLine +
-                "\tLevel: " + entity.Level + "  Health: " + entity.CurrentHealth + "/" + entity.MaxHealth + "  SpellPoints: " + entity.CurrentMagicka + "/" + entity.MaxMagicka + System.Environment.NewLine +
+                "\tLevel: " + entity.Level + "  Health: " + entity.CurrentHealth + "/" + entity.MaxHealth + "  SpellPoints: " + entity.CurrentMagicka + "/" + entity.MaxMagicka +
+                "  Spell Missile Speed: " + entityEffectManager.FireMissilePrefab.MovementSpeed +           // only prints the Fire Missile speed but this should do as the others should be equal
+                System.Environment.NewLine +
                 "\tAttributes.  Willpower=" + entity.Stats.PermanentWillpower + "  Intelligence=" + entity.Stats.PermanentIntelligence + "  Speed=" + entity.Stats.PermanentSpeed +
                 "  Luck=" + entity.Stats.PermanentLuck + "  Agility=" + entity.Stats.PermanentAgility + "  Strength=" + entity.Stats.PermanentStrength +
                 "  Endurance=" + entity.Stats.PermanentEndurance + "  Personality=" + entity.Stats.PermanentPersonality + System.Environment.NewLine +
-                skillString + System.Environment.NewLine +
+                skillString + System.Environment.NewLine +  
                 "\tResistances. Fire=" + entity.Resistances.PermanentFire + " Frost=" + entity.Resistances.PermanentFrost + " DiseaseOrPoison=" + entity.Resistances.PermanentDiseaseOrPoison +
                 " Shock=" + entity.Resistances.PermanentShock + " Magic =" + entity.Resistances.PermanentMagic + System.Environment.NewLine +
                 itemString + System.Environment.NewLine + 
@@ -574,6 +579,34 @@ namespace MTMMM
                 }
             }
         }
+                
+        // LVL1  - LVL10 -> MissileSpeed = 11.0f + LVL (at LVL2, it is 13.0f)
+        // LVL10 - LVL19 -> MissileSpeed = 21.0f + (LVL-10)*2 
+        // LVL20 - LVL29 -> MissileSpeed = 41.0f + (LVL-20)*2.5
+        // LVL30 -       -> MissileSpeed = 67.0f  
+        float CalculateDesirableEnemyMissileSpeeds (int level)
+        {
+            if (level < 1) return 11.0f;
+            if (level <= 10)
+                return (float)(11 + level);
+            if (level <= 20)
+                return (float)(21 + (level - 10) * 2);
+            if (level <= 30)
+                return (float)(41 + (level - 20) * 5 / 2);  // INT *2.5
+            return 67.0f;
+        }              
+
+        void setMissileSpeedInPrefabs()
+        {
+            float desirableMissileSpeeds = CalculateDesirableEnemyMissileSpeeds(entity.Level);
+            SilentMessage("setMissileSpeedInPrefabs called: "+ desirableMissileSpeeds+" level calculated as appropriate, applying to prefabs...");
+
+            entityEffectManager.FireMissilePrefab.MovementSpeed = desirableMissileSpeeds;
+            entityEffectManager.ColdMissilePrefab.MovementSpeed = desirableMissileSpeeds;
+            entityEffectManager.PoisonMissilePrefab.MovementSpeed = desirableMissileSpeeds;
+            entityEffectManager.ShockMissilePrefab.MovementSpeed = desirableMissileSpeeds;
+            entityEffectManager.MagicMissilePrefab.MovementSpeed = desirableMissileSpeeds;            
+        }
 
         void Start()
         {
@@ -585,11 +618,18 @@ namespace MTMMM
             int playerLevel = playerEntity.Level;
             string debugString;                                                                                                 // TODO: use this to streamline debug messaging (less messages, more details/message)
 
-            entityBehaviour = GetComponent<DaggerfallEntityBehaviour>();
-
+            entityBehaviour = GetComponent<DaggerfallEntityBehaviour>();   
             if (entityBehaviour==null)
             {
                 SilentMessage("RecalcStats.Start() has been called. Entitybehaviour is null. exiting");
+                return;
+            }
+
+
+            entityEffectManager = GetComponent<EntityEffectManager>();
+            if (entityEffectManager == null)
+            {
+                SilentMessage("RecalcStats.Start() has been called. entityEffectManager is null. exiting");
                 return;
             }
 
@@ -687,6 +727,9 @@ namespace MTMMM
 
                 SetEquipmentMaterials();
                 EntityCharacteristicsToLog("Enemy monster characteristics AFTER changes made. ");
+
+                if (enemySpellMissileSpeeds == 1)
+                    setMissileSpeedInPrefabs();                
 
                 return; 
             }
@@ -913,6 +956,9 @@ namespace MTMMM
                 entity.Skills.SetPermanentSkillValue(DFCareer.Skills.Alteration, spellSkillLevel);
                 entity.Skills.SetPermanentSkillValue(DFCareer.Skills.Thaumaturgy, spellSkillLevel);
                 entity.Skills.SetPermanentSkillValue(DFCareer.Skills.Mysticism, spellSkillLevel);
+
+                if (enemySpellMissileSpeeds == 1)
+                    setMissileSpeedInPrefabs();             
             }
             /* V. now, re-setting the equipment
              * Equipment should reflect enemy entity level (not player level and not dungeon level),

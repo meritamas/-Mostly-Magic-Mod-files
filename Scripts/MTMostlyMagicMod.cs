@@ -1,5 +1,5 @@
 // Project:         MeriTamas's (Mostly) Magic Mod for Daggerfall Unity (http://www.dfworkshop.net)
-// Copyright:       Copyright (C) 2022 meritamas
+// Copyright:       Copyright (C) 2023 meritamas
 // License:         MIT License (http://www.opensource.org/licenses/mit-license.php)
 // Author:          meritamas (meritamas@outlook.com)
 
@@ -122,13 +122,21 @@ namespace MTMMM
                 //  GameManager.Instance.SunlightManager.Angle = -40f;      this code does not work ; but this is where the code that does the job should go 
             }
 
+            if (ourModSettings.GetValue<bool>("EverydayNonMagic", "IntegrateMeanerMonsters"))
+                MTMeanerMonsters.InitMod();         // this should initialize the Meaner Monsters part - integrated from Hazelnut&Ralzar's mod
 
-            MTMeanerMonsters.InitMod();         // this should initialize the Meaner Monsters part - integrated from Hazelnut&Ralzar's mod
+            // this is to activate Jay_H's unleveledmobs functionality
+            if (ourModSettings.GetValue<bool>("EverydayNonMagic", "IntegrateUnleveledMobs"))
+            {
+                MTUnleveledMobs.SetTables();
+                MTUnleveledMobs.UpdateTables();
+                SilentMessage("UnleveledEnemies part: Set up spawn tables");
+            }
         }
 
         public void Start()
         {
-            if (ourModSettings.GetValue<bool>("UnleveledAndExtraStrongEnemies", "UnleveledAndExtraStrongEnemies-Main"))
+            if (ourModSettings.GetValue<bool>("AndExtraStrongEnemies", "UnleveledAndExtraStrongEnemies-Main"))
                 InitUnleveledEnemiesOnAwake();
         }
 
@@ -164,20 +172,27 @@ namespace MTMMM
         #region ModInit common parts
 
         /// <summary>
-        /// Gives the player info on init success.      // TODO: re-evaluate the need for this
+        /// Does the stuff at game load
         /// </summary>
         [Invoke(StateManager.StateTypes.Game, 1)]
         public static void GiveInfoToPlayer(InitParams initParams)
         {
+                    //GiveInfoToPlayer
             if (problem)
                 Message("Problem adding Advanced Teleport", true, true, true, true);
             else
                 SilentMessage("Override for Teleport (Recall) (Advanced Teleportation) successfully registered.");
 
             if (ourModSettings.GetValue<bool>("QualityOfLife", "ExerciseFastTravel"))
-                InitTimeAcceleratorPart();
+                InitTimeAcceleratorPart();            
 
-
+            if (ourModSettings.GetValue<int>("EverydayMagic", "PlayerSpellMissileSpeed") == 1)
+                            // TODO: check if condition correct
+            {
+                MMMXPTallies.SetMissileSpeedsInPrefabs();        // set the missile speeds once when the game is loaded
+                GameManager.Instance.PlayerSpellCasting.OnReleaseFrame += MMMXPTallies.SetMissileSpeedsInPrefabs;
+                                // register the routine to set the missile speeds after each player spellcast based on new experience data
+            }
         }
 
         /// <summary>
@@ -190,6 +205,7 @@ namespace MTMMM
             Debug.Log("MT MMM: (Mostly) Magic Mod Init Started");
             modInstance = ModManager.Instance.GetMod(modTitle);
             ourModSettings = modInstance.GetSettings();
+            MMMXPTallies.CalculationDebugToPlayer = true;
         }        
 
         /// <summary>
@@ -203,12 +219,7 @@ namespace MTMMM
             // GameObject go2 = new GameObject(modInstance.Title);      // part added to general init in order to init save/load features
             // go2.AddComponent<MTMostlyMagicMod>();   // initializing the Unleveled and Extra Strong enemies part
 
-            SilentMessage("Enemy prefab changed successfully");
-
-                // this is for unleveledmobs
-            MTUnleveledMobs.SetTables();
-            MTUnleveledMobs.UpdateTables();
-            SilentMessage("UnleveledEnemies part: Set up spawn tables");
+            SilentMessage("Enemy prefab changed successfully");            
 
             SilentMessage("InitUnleveledEnemies module init method Finished");
         }        
@@ -237,11 +248,13 @@ namespace MTMMM
             modInstance.SaveDataInterface = instance;               // this part is responsible for initializing the Save/Load feature      
 
             InitNewSpellsAndEffects();
+
             if (ourModSettings.GetValue<bool>("UnleveledAndExtraStrongEnemies", "UnleveledAndExtraStrongEnemies-Main"))
                 InitUnleveledEnemiesOnStart();
-
             MTRecalcStats.extraStrongMonsters = ourModSettings.GetValue<bool>("UnleveledAndExtraStrongEnemies", "ExtraStrongMonsters");
             SilentMessage("Extra Strong Monsters Enabled = " + MTRecalcStats.extraStrongMonsters);
+            MTRecalcStats.enemySpellMissileSpeeds = ourModSettings.GetValue<int>("UnleveledAndExtraStrongEnemies", "EnemySpellMissileSpeed");
+            SilentMessage("Enemy Spell Missile Speed Choice = " + MTRecalcStats.enemySpellMissileSpeeds);
 
             InitEverydayMagic();
 
@@ -731,7 +744,7 @@ namespace MTMMM
             MMMXPTallies.diversifiedSpellExperienceRequiredForMagicSkillAdvancement = ourModSettings.GetValue<bool>("EverydayMagic", "DiversifiedSpellExperienceRequiredForMagicSkillAdvancement");            
 
                                 // UNLEVELED SPELLS
-            if (ourModSettings.GetValue<bool>("EverydayMagic", "UnleveledSpells"))
+            if (ourModSettings.GetValue<bool>("EverydayMagic", "UnleveledSpellsAndPotions"))
             {                
                 MMMFormulaHelper.SendInfoMessagesOnPCSpellLevel = true;     // temporary solution, intention: save these to player log
                 MMMFormulaHelper.SendInfoMessagesOnNonPCSpellLevel = true;  // temporary solution, intention: save these to player log and send message to hud
@@ -765,6 +778,10 @@ namespace MTMMM
             MTSpellMakerWindow.spellCreationTimeCoefficient = ourModSettings.GetValue<float>("EverydayMagic", "SpellCreationTimeCoefficient");
             MMMFormulaHelper.spellMakerCoefficientFromSettings = ourModSettings.GetValue<float>("EverydayMagic", "SpellCreationTimeCoefficient");
 
+                            // PLAYER SPELL MISSILE SPEED
+            MMMFormulaHelper.SpellMissileSpeedRegime = ourModSettings.GetValue<int>("EverydayMagic", "PlayerSpellMissileSpeed");
+                            // the changes are effectuated when game loaded and then as spells are cast - see at init procedure for game state 1 and code in MMMFormulaHelper and MMMXPTallies      
+
             if (true)           // TODO but can wait : a condition that would be true if the base game has been edited to use my skill&attribute system
             {
                 FormulaHelper.RegisterOverride(modInstance, "CalculateEffectCosts", (Func<IEntityEffect, EffectSettings, DaggerfallEntity, FormulaHelper.SpellCost>)MMMFormulaHelper.CalculateEffectCosts);
@@ -785,7 +802,7 @@ namespace MTMMM
             else
                 SilentMessage("No need to register MTSpellBookWindow or MTSpellMakerWindow");
 
-            if (ourModSettings.GetValue<bool>("EverydayMagic", "UnleveledSpells"))  // if spells unleveled, need to tackle potions
+            if (ourModSettings.GetValue<bool>("EverydayMagic", "UnleveledSpellsAndPotions"))  // if spells unleveled, need to tackle potions
             {
                 UIWindowFactory.RegisterCustomUIWindow(UIWindowType.Inventory, typeof(MTInventoryWindow));
             }
@@ -951,3 +968,4 @@ namespace MTMMM
         #endregion
     }
 }
+ 

@@ -1,5 +1,5 @@
 // Project:         MeriTamas's (Mostly) Magic Mod for Daggerfall Unity (http://www.dfworkshop.net)
-// Copyright:       Copyright (C) 2022 meritamas
+// Copyright:       Copyright (C) 2023 meritamas
 // License:         MIT License (http://www.opensource.org/licenses/mit-license.php)
 // Author:          meritamas (meritamas@outlook.com)
 // Credits due to the DFU developers based on the work of whom this class could be created.

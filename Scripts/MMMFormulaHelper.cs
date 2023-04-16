@@ -1,5 +1,5 @@
 // Project:         MeriTamas's (Mostly) Magic Mod for Daggerfall Unity (http://www.dfworkshop.net)
-// Copyright:       Copyright (C) 2022 meritamas
+// Copyright:       Copyright (C) 2023 meritamas
 // License:         MIT License (http://www.opensource.org/licenses/mit-license.php)
 // Author:          meritamas (meritamas@outlook.com)
 // Big thanks to Gavin Clayton (interkarma@dfworkshop.net) for his suggestion to create this class. This will make things easier and be an asset as the mod becomes larger.
@@ -31,6 +31,7 @@ namespace MTMMM
         public static bool SendInfoMessagesOnPCSpellLevel = false;
         public static bool SendInfoMessagesOnNonPCSpellLevel = false;
         public static bool ApplyExperienceTallies;
+        public static int SpellMissileSpeedRegime;
         public static bool PotionMode = false;
         public static int PotionStrength = 0;
         public static float spellMakerCoefficientFromSettings = 4.0f;
@@ -331,6 +332,37 @@ namespace MTMMM
                 int targetTypeCoefficient = MMMXPTallies.GetTargetTypeCoefficient(MMMXPTallies.GetMMMTargetType(targetType, effectKey));
                 float combinedXPTalliesCoefficient = (float)effectCoefficient * elementCoefficient * targetTypeCoefficient;
                 return (float)combinedXPTalliesCoefficient / 1000000f;
+            }
+        }
+
+        /// <summary>
+        /// This is safe to call even if we are not taking missile and elemental experience into account when deterniming missile speed.
+        /// </summary>
+        /// <param name="effectKey"></param>
+        /// <param name="targetType"></param>
+        /// <param name="elementType"></param>
+        /// <returns></returns>
+        public static float CalculateCombinedXPTalliesCoefficientForMissileSpeed(ElementTypes elementType, bool debugCalulationsToPlayer=true)
+        {
+            // the easiest way we can get XP Tallies not to have a meaningful effect in spell missile speed calculations is to have the code return 25.0 here, so:
+            if (SpellMissileSpeedRegime==0)
+                return 25.0f;       
+            else
+            {
+                if (SpellMissileSpeedRegime == 1)
+                {
+                    int elementCoefficient = MMMXPTallies.GetElementCoefficient(elementType);                   // 70 + (var 0..30) just right here               overall 70..100
+                    int missileTargetTypeCoefficient = MMMXPTallies.GetMissileTargetTypeCoefficient() - 60;     // subtracting 60 to get 10+ (var 0..30)    overall 10..40
+                    float combinedMissileSpeedCoefficient = (float)elementCoefficient * missileTargetTypeCoefficient; // we are getting 700..4000
+                              //    here we should return 13.0f for 700 and multiply by ( combinedMissileSpeedCoefficient / 700 )
+                    if (debugCalulationsToPlayer)
+                        SilentMessage(string.Format("CalculateCombinedXPTalliesCoefficientForMissileSpeed: Element {0}; elementCoefficient: {1}, missileTargetTypeCoefficient: {2}, combinedMissileSpeedCoefficient: {3} ",
+                            elementType, elementCoefficient, missileTargetTypeCoefficient, combinedMissileSpeedCoefficient));
+
+                    return (float)(combinedMissileSpeedCoefficient / 700.0f * 13.0f);
+                }
+                else
+                    return 25.0f;   // just to make sure 25 is returned
             }
         }
 
@@ -764,7 +796,6 @@ namespace MTMMM
             SilentMessage("LiveINT=" + ourLiveIntelligence + ", magickaCost=" + magickaCost +
                 ", IntelligenceRatio=" + intelligenceRatio + ", TimeCost=" + spellLearningTimeCost);
             return spellLearningTimeCost;
-        }        
-        
+        }       
     }
 }
